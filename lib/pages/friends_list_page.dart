@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import './chat_page.dart';
@@ -39,6 +42,10 @@ class _FriendsListPageState extends State<FriendsListPage> {
 
     friendsList.removeAt(index);
     await prefs.setStringList('friends', friendsList);
+
+    setState(() {
+      _friends.removeAt(index);
+    });
   }
 
   Future<void> _showDeleteConfirmationDialog(int index) async {
@@ -59,14 +66,63 @@ class _FriendsListPageState extends State<FriendsListPage> {
             TextButton(
               child: const Text('Remove'),
               onPressed: () {
-                setState(() {
-                  _removeFriend(index);
-                  _friends.removeAt(index);
-                });
+                _removeFriend(index);
 
                 ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Friend removed')));
                 Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _selectNewPhoto(int index) async {
+    final ImagePicker _picker = ImagePicker();
+    final XFile? pickedFile = await _picker.pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: CameraDevice.rear,
+      maxWidth: 800,
+      maxHeight: 800,
+    );
+
+    if (pickedFile != null) {
+      final Directory directory = await getApplicationDocumentsDirectory();
+      final String newPath = '${directory.path}/${_friends[index]['name']}.png';
+
+      await File(pickedFile.path).copy(newPath);
+      _friends[index]['photoPath'] = newPath;
+
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      List<String> friendsList =
+          _friends.map((friend) => jsonEncode(friend)).toList().cast<String>();
+      await prefs.setStringList('friends', friendsList);
+
+      setState(() {});
+    }
+  }
+
+  Future<void> _showConfirmNewPhotoDialog(int index) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm'),
+          content: const Text('Do you want to take a new photo?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Take Photo'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _selectNewPhoto(index);
               },
             ),
           ],
@@ -105,9 +161,15 @@ class _FriendsListPageState extends State<FriendsListPage> {
                       ),
                     ),
                     child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage:
-                            AssetImage('assets/images/avatar-${index + 1}.png'),
+                      leading: InkWell(
+                        onTap: () async {
+                          await _showConfirmNewPhotoDialog(index);
+                        },
+                        child: CircleAvatar(
+                          backgroundImage: friend['photoPath'] == null
+                              ? null
+                              : FileImage(File(friend['photoPath'])),
+                        ),
                       ),
                       title: Text(friend['name']),
                       subtitle: Text('0.${index + 1}m'),
@@ -117,8 +179,7 @@ class _FriendsListPageState extends State<FriendsListPage> {
                           MaterialPageRoute(
                             builder: (context) => ChatPage(
                               friendName: friend['name'],
-                              friendAvatar:
-                                  'assets/images/avatar-${index + 1}.png',
+                              friendAvatar: friend['photoPath'],
                             ),
                           ),
                         );

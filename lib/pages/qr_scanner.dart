@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_vibrate/flutter_vibrate.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../utils/nostr.dart';
 
 class QRScannerPage extends StatefulWidget {
@@ -54,18 +58,22 @@ class _QRScannerPageState extends State<QRScannerPage> {
     });
   }
 
-  Future<bool> _addFriend(String rawData) async {
+  Future<bool> _addFriend(String rawData, String? photoPath) async {
     final Map<String, dynamic> friendData = jsonDecode(rawData);
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
     List<String> friendsList = prefs.getStringList('friends') ?? [];
-
     // Check if the friend is already in the list
     for (String friend in friendsList) {
       final Map<String, dynamic> existingFriend = jsonDecode(friend);
       if (existingFriend['privateKey'] == friendData['privateKey']) {
         return false; // Friend is already in the list
       }
+    }
+
+    // Add the photo path to the friend data
+    if (photoPath != null) {
+      friendData['photoPath'] = photoPath;
     }
 
     friendsList.add(jsonEncode(friendData));
@@ -91,6 +99,49 @@ class _QRScannerPageState extends State<QRScannerPage> {
     } catch (e) {
       return false;
     }
+  }
+
+  Future<String?> _promptForPhoto(
+      String friendName, String friendKey, CameraDevice cameraDevice) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+        source: ImageSource.camera, preferredCameraDevice: cameraDevice);
+
+    if (pickedFile != null) {
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = '${friendName}_$friendKey.jpg';
+      final file = File('${appDir.path}/$fileName');
+      await pickedFile.saveTo(file.path);
+
+      setState(() {
+        qrResult = '$friendName has been added as a friend!';
+      });
+
+      return file.path;
+    } else {
+      setState(() {
+        qrResult = 'No photo was taken.';
+      });
+
+      return null;
+    }
+  }
+
+  Future<bool> _isFriendAlreadyAdded(String rawData) async {
+    final Map<String, dynamic> friendData = jsonDecode(rawData);
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    List<String> friendsList = prefs.getStringList('friends') ?? [];
+
+    // Check if the friend is already in the list
+    for (String friend in friendsList) {
+      final Map<String, dynamic> existingFriend = jsonDecode(friend);
+      if (existingFriend['privateKey'] == friendData['privateKey']) {
+        return true; // Friend is already in the list
+      }
+    }
+
+    return false;
   }
 
   @override
@@ -138,18 +189,31 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                     jsonDecode(barcode.rawValue!);
                                 final String friendName = friendData['name'];
 
-                                bool isAdded =
-                                    await _addFriend(barcode.rawValue!);
-                                _toggleScan();
-                                setState(() {
-                                  if (isAdded) {
-                                    qrResult =
-                                        '$friendName has been added as a friend!';
-                                  } else {
+                                bool isAlreadyAdded =
+                                    await _isFriendAlreadyAdded(
+                                        barcode.rawValue!);
+                                String? photoPath;
+                                if (!isAlreadyAdded) {
+                                  photoPath = await _promptForPhoto(
+                                      friendName,
+                                      friendData['privateKey'],
+                                      CameraDevice.rear);
+                                  bool isAdded = await _addFriend(
+                                      barcode.rawValue!, photoPath);
+                                  _toggleScan();
+                                  setState(() {
+                                    if (isAdded) {
+                                      qrResult =
+                                          '$friendName has been added as a friend!';
+                                    }
+                                  });
+                                } else {
+                                  _toggleScan();
+                                  setState(() {
                                     qrResult =
                                         '$friendName is already your friend!';
-                                  }
-                                });
+                                  });
+                                }
 
                                 debugPrint(
                                     'QR code found! ${barcode.rawValue}');

@@ -1,9 +1,7 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:hex/hex.dart';
 import '../utils/nostr.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -27,20 +25,10 @@ class _ProfilePageState extends State<ProfilePage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? name = prefs.getString('user_name');
     String? globalKey = prefs.getString('global_key');
-
-    if (globalKey != null) {
-      Uint8List decodedKey = base64Url.decode(globalKey);
-      String privateKey = HEX.encode(decodedKey);
-      setState(() {
-        _name = name;
-        _globalKey = getPublicKey(privateKey);
-      });
-    } else {
-      setState(() {
-        _name = name;
-        _globalKey = null;
-      });
-    }
+    setState(() {
+      _name = name;
+      _globalKey = getPublicKey(globalKey);
+    });
   }
 
   Future<void> _resetAndCloseApp() async {
