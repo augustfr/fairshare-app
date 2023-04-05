@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import './chat_page.dart';
 import './profile_page.dart';
+import '../utils/friends.dart';
 
 class FriendsListPage extends StatefulWidget {
   const FriendsListPage({Key? key}) : super(key: key);
@@ -26,8 +27,8 @@ class _FriendsListPageState extends State<FriendsListPage> {
   }
 
   Future<void> _loadFriends() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String> friendsList = prefs.getStringList('friends') ?? [];
+    List<String> friendsList = await loadFriends();
+    print(friendsList);
 
     setState(() {
       _friends = friendsList

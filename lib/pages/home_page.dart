@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:ui' as ui;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
@@ -6,6 +10,7 @@ import '../models/map_style.dart';
 import './friends_list_page.dart';
 import './qr_scanner.dart';
 import '../utils/nostr.dart';
+import '../utils/friends.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -16,14 +21,28 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   GoogleMapController? _controller;
+  Set<Marker> _markers = {}; // Add this line to store markers
 
   late Future<CameraPosition> _initialCameraPosition;
+
+  StreamSubscription<LocationData>? _locationSubscription;
+
+  void _subscribeToLocationUpdates() {
+    final location = Location();
+
+    _locationSubscription =
+        location.onLocationChanged.listen((LocationData currentLocation) {
+      // on location update do something
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     _initialCameraPosition = _getCurrentLocation();
     _checkFirstTimeUser();
+    _subscribeToLocationUpdates();
+    _fetchFriendsLocations(); // Add this line to fetch friends locations
   }
 
   // Method to get current location
@@ -50,6 +69,62 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<BitmapDescriptor> _createCircleMarkerIcon(
+      Color color, double circleRadius) async {
+    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(pictureRecorder);
+    final Paint paint = Paint()..color = color;
+    final double radius = circleRadius;
+
+    canvas.drawCircle(Offset(radius, radius), radius, paint);
+
+    final ui.Image image = await pictureRecorder
+        .endRecording()
+        .toImage((radius * 2).toInt(), (radius * 2).toInt());
+    final ByteData? byteData =
+        await image.toByteData(format: ui.ImageByteFormat.png);
+
+    return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+  }
+
+  Future<void> _fetchFriendsLocations() async {
+    try {
+      List<String> friendsList = await loadFriends();
+      // Create a custom marker icon with a specified color and radius
+      BitmapDescriptor customMarkerIcon =
+          await _createCircleMarkerIcon(Colors.red, 20);
+
+      for (var friendJson in friendsList) {
+        Map<String, dynamic> friendData = jsonDecode(friendJson);
+        List<dynamic>? currentLocation = friendData['currentLocation'];
+        String? friendName = friendData['name'];
+        if (currentLocation != null &&
+            currentLocation.length == 2 &&
+            friendName != null) {
+          LatLng friendLatLng = LatLng(currentLocation[0], currentLocation[1]);
+          setState(() {
+            _markers.add(
+              Marker(
+                markerId: MarkerId(friendName),
+                position: friendLatLng,
+                infoWindow: InfoWindow(title: friendName),
+                icon: customMarkerIcon, // Use the custom marker icon
+              ),
+            );
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching friends locations: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -67,6 +142,7 @@ class _HomePageState extends State<HomePage> {
                   GoogleMap(
                     initialCameraPosition: snapshot.data!,
                     myLocationEnabled: true,
+                    markers: _markers, // Add this line to include markers
                     onMapCreated: (GoogleMapController controller) {
                       _controller = controller;
                       _controller!.setMapStyle(MapStyle().dark);
