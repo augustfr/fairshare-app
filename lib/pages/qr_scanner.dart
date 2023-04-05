@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_vibrate/flutter_vibrate.dart';
@@ -35,7 +34,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
     cameraController = MobileScannerController();
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
       setState(() {
-        _privateKey = _generateRandomPrivateKey();
+        _privateKey = generateRandomPrivateKey();
       });
     });
   }
@@ -51,7 +50,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       _userName = prefs.getString('user_name') ?? '';
-      _privateKey = _generateRandomPrivateKey();
+      _privateKey = generateRandomPrivateKey();
     });
   }
 
@@ -72,12 +71,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
     friendsList.add(jsonEncode(friendData));
     await prefs.setStringList('friends', friendsList);
     return true; // Friend added successfully
-  }
-
-  String _generateRandomPrivateKey() {
-    final random = Random.secure();
-    final values = List<int>.generate(32, (i) => random.nextInt(256));
-    return base64Url.encode(values);
   }
 
   void _toggleScan() {

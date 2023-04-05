@@ -1,9 +1,10 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:hex/hex.dart';
+import '../utils/nostr.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -14,7 +15,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   String? _name;
-  File? _image;
+  String? _globalKey;
 
   @override
   void initState() {
@@ -25,72 +26,21 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _loadUserDetails() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? name = prefs.getString('user_name');
-    String? imagePath = prefs.getString('user_image');
+    String? globalKey = prefs.getString('global_key');
 
-    setState(() {
-      _name = name;
-      _image = imagePath != null ? File(imagePath) : null;
-    });
-  }
-
-  Future<void> _updateImage(ImageSource source) async {
-    // Check if app has permission to access gallery and camera
-    final galleryPermissionStatus = await Permission.storage.status;
-    final cameraPermissionStatus = await Permission.camera.status;
-    if (galleryPermissionStatus.isDenied ||
-        galleryPermissionStatus.isRestricted ||
-        cameraPermissionStatus.isDenied ||
-        cameraPermissionStatus.isRestricted) {
-      // Request permission if necessary
-      await Permission.storage.request();
-      await Permission.camera.request();
-    }
-    final ImagePicker _picker = ImagePicker();
-    final XFile? pickedFile = await _picker.pickImage(source: source);
-
-    if (pickedFile != null) {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      prefs.setString('user_image', pickedFile.path);
-
+    if (globalKey != null) {
+      Uint8List decodedKey = base64Url.decode(globalKey);
+      String privateKey = HEX.encode(decodedKey);
       setState(() {
-        _image = File(pickedFile.path);
+        _name = name;
+        _globalKey = getPublicKey(privateKey);
       });
     } else {
       setState(() {
-        _image = null;
+        _name = name;
+        _globalKey = null;
       });
     }
-  }
-
-  Future<void> _showImageSourceOptions(BuildContext context) {
-    return showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              ListTile(
-                leading: const Icon(Icons.camera),
-                title: const Text('Take a selfie'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _updateImage(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('Pick from library'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _updateImage(ImageSource.gallery);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   Future<void> _resetAndCloseApp() async {
@@ -124,6 +74,17 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         );
       },
+    );
+  }
+
+  void _copyToClipboard() {
+    Clipboard.setData(ClipboardData(
+        text: _globalKey ?? 'None')); // copy the user ID to clipboard
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('User ID copied to clipboard'),
+        duration: Duration(seconds: 2),
+      ),
     );
   }
 
@@ -183,22 +144,49 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    GestureDetector(
-                      onTap: () => _showImageSourceOptions(context),
-                      behavior: HitTestBehavior.translucent,
-                      child: CircleAvatar(
-                        backgroundImage: (_image != null
-                                ? FileImage(_image!)
-                                : const AssetImage(
-                                    'assets/images/avatar-1.png'))
-                            as ImageProvider<Object>?,
-                        radius: 50,
-                      ),
-                    ),
                     const SizedBox(height: 20),
                     Text(
                       _name ?? 'Anonymous',
                       style: Theme.of(context).textTheme.headlineSmall!,
+                    ),
+                    GestureDetector(
+                      onTap: () => _copyToClipboard(),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        margin: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          color: Colors.grey[200],
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.grey,
+                              blurRadius: 5.0,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'User ID',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            SelectableText(
+                              _globalKey ?? 'Anonymous',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall!
+                                  .copyWith(
+                                    fontSize: 14.0,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
