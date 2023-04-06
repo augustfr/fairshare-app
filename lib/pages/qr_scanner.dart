@@ -8,8 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../utils/nostr.dart';
+
+const loopTime = 10; //in seconds
 
 class QRScannerPage extends StatefulWidget {
   final VoidCallback onQRScanSuccess;
@@ -36,10 +37,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
     super.initState();
     _loadUserData();
     cameraController = MobileScannerController();
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      setState(() {
-        _privateKey = generateRandomPrivateKey();
-      });
+    _timer = Timer.periodic(const Duration(seconds: loopTime), (timer) async {
+      await _updateKey();
     });
   }
 
@@ -52,10 +51,28 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   Future<void> _loadUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    await _updateKey();
     setState(() {
       _userName = prefs.getString('user_name') ?? '';
-      _privateKey = generateRandomPrivateKey();
     });
+  }
+
+  Future<void> _updateKey() async {
+    String privateKey = generateRandomPrivateKey();
+    String pubKey = getPublicKey(privateKey);
+    setState(() {
+      _privateKey = privateKey;
+    });
+    String event = await listenForConfirm(publicKey: pubKey);
+    String friendName = getContent(event);
+    String? photoPath =
+        await _promptForPhoto(friendName, privateKey, CameraDevice.rear);
+    Map<String, String> jsonMap = {
+      "name": friendName,
+      "privateKey": privateKey
+    };
+    String jsonString = json.encode(jsonMap);
+    _addFriend(jsonString, photoPath);
   }
 
   Future<bool> _addFriend(String rawData, String? photoPath) async {
@@ -83,6 +100,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
     friendsList.add(jsonEncode(friendData));
 
     await prefs.setStringList('friends', friendsList);
+    Vibrate.feedback(FeedbackType.success);
     return true; // Friend added successfully
   }
 
@@ -109,27 +127,56 @@ class _QRScannerPageState extends State<QRScannerPage> {
   Future<String?> _promptForPhoto(
       String friendName, String friendKey, CameraDevice cameraDevice) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-        source: ImageSource.camera, preferredCameraDevice: cameraDevice);
+    bool confirmTakePhoto = false;
 
-    if (pickedFile != null) {
-      final appDir = await getApplicationDocumentsDirectory();
-      final fileName = '${friendName}_$friendKey.jpg';
-      final file = File('${appDir.path}/$fileName');
-      await pickedFile.saveTo(file.path);
+    await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Add Contact Photo'),
+            content: Text('Do you want to add a photo of $friendName?'),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('No'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+              TextButton(
+                child: const Text('Yes'),
+                onPressed: () {
+                  confirmTakePhoto = true;
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        });
 
+    if (!confirmTakePhoto) {
       setState(() {
         qrResult = '$friendName has been added as a friend!';
       });
-
-      return file.path;
-    } else {
-      setState(() {
-        qrResult = 'No photo was taken.';
-      });
-
       return null;
     }
+
+    final pickedFile = await picker.pickImage(
+        source: ImageSource.camera, preferredCameraDevice: cameraDevice);
+
+    setState(() {
+      qrResult = '$friendName has been added as a friend!';
+    });
+
+    if (pickedFile == null) {
+      return null;
+    }
+
+    final appDir = await getApplicationDocumentsDirectory();
+    final fileName = '${friendName}_$friendKey.jpg';
+    final file = File('${appDir.path}/$fileName');
+    await pickedFile.saveTo(file.path);
+
+    return file.path;
   }
 
   Future<bool> _isFriendAlreadyAdded(String rawData) async {
@@ -173,6 +220,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     onPressed: _toggleScan,
                     child: Text(_isScanning ? 'Stop Scanning' : 'Scan'),
                   ),
+                  // ElevatedButton(
+                  //   onPressed: () async {
+                  //     await postToNostr(_privateKey, 'Gene');
+                  //   },
+                  //   child: const Text('Debug scanned'),
+                  // ),
                   Visibility(
                     visible: _isScanning,
                     child: SizedBox(
@@ -198,7 +251,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                     await _isFriendAlreadyAdded(
                                         barcode.rawValue!);
                                 String? photoPath;
+                                SharedPreferences prefs =
+                                    await SharedPreferences.getInstance();
+                                String? name = prefs.getString('user_name');
                                 if (!isAlreadyAdded) {
+                                  postToNostr(friendData['privateKey'],
+                                      name ?? 'Anonymous');
                                   photoPath = await _promptForPhoto(
                                       friendName,
                                       friendData['privateKey'],
@@ -222,7 +280,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
                                 debugPrint(
                                     'QR code found! ${barcode.rawValue}');
-                                Vibrate.feedback(FeedbackType.success);
                                 _previousBarcodeValue = barcode.rawValue;
                                 widget.onQRScanSuccess();
                               }
