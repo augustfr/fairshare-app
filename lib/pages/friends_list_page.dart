@@ -28,7 +28,6 @@ class _FriendsListPageState extends State<FriendsListPage> {
 
   Future<void> _loadFriends() async {
     List<String> friendsList = await loadFriends();
-    print(friendsList);
 
     setState(() {
       _friends = friendsList

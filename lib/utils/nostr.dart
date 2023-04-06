@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'dart:convert';
-import 'dart:math';
 import 'dart:async';
 import 'package:nostr/nostr.dart';
 
@@ -43,4 +41,35 @@ String generateRandomPrivateKey() {
 
 String getPublicKey(privateKey) {
   return Keychain(privateKey).public;
+}
+
+Future<void> postToNostr(String privateKey, String content) async {
+  // Create a partial event from nothing and fill it with data until it is valid
+  var eventToSend = Event.partial();
+  assert(eventToSend.isValid() == false);
+  eventToSend.createdAt = currentUnixTimestampSeconds();
+  eventToSend.pubkey = getPublicKey(privateKey);
+  eventToSend.id = eventToSend.getEventId();
+  eventToSend.sig = eventToSend.getSignature(privateKey);
+  assert(eventToSend.isValid() == true);
+
+  // Instantiate an event with a partial data and let the library sign the event with your private key
+  Event anotherEvent =
+      Event.from(kind: 1, tags: [], content: content, privkey: privateKey);
+  // Connecting to a nostr relay using websocket
+  WebSocket webSocket = await WebSocket.connect(
+    'wss://relay.damus.io', // or any nostr relay
+  );
+
+  // Send an event to the WebSocket server
+  webSocket.add(anotherEvent.serialize());
+
+  // Listen for events from the WebSocket server
+  await Future.delayed(const Duration(seconds: 1));
+  webSocket.listen((event) {
+    print('Received event: $event');
+  });
+
+  // Close the WebSocket connection
+  await webSocket.close();
 }
