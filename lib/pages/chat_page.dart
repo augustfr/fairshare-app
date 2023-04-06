@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 class ChatPage extends StatefulWidget {
   final String friendName;
-  final String friendAvatar;
 
-  ChatPage({required this.friendName, required this.friendAvatar});
+  const ChatPage({Key? key, required this.friendName}) : super(key: key);
 
   @override
   _ChatPageState createState() => _ChatPageState();
@@ -38,13 +37,14 @@ class _ChatPageState extends State<ChatPage> {
                 itemBuilder: (BuildContext context, int index) {
                   return ChatBubble(
                     text: _messages[index],
-                    isSent: true, // Set to true since only the user can send messages
+                    isSent:
+                        true, // Set to true since only the user can send messages
                   );
                 },
               ),
             ),
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: Row(
                 children: [
                   Expanded(
@@ -61,12 +61,12 @@ class _ChatPageState extends State<ChatPage> {
                       },
                     ),
                   ),
-                  SizedBox(width: 8.0),
+                  const SizedBox(width: 8.0),
                   FloatingActionButton(
                     onPressed: () {
                       _sendMessage(_textController.text);
                     },
-                    child: Icon(Icons.send),
+                    child: const Icon(Icons.send),
                   ),
                 ],
               ),
@@ -82,28 +82,34 @@ class ChatBubble extends StatelessWidget {
   final String text;
   final bool isSent;
 
-  ChatBubble({required this.text, required this.isSent});
+  const ChatBubble({Key? key, required this.text, required this.isSent})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
       child: Row(
-        mainAxisAlignment: isSent ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment:
+            isSent ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           Container(
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.6,
             ),
-            padding: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-            margin: EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+            margin: const EdgeInsets.symmetric(vertical: 4),
             decoration: BoxDecoration(
               color: isSent ? Colors.blue : Colors.grey[300],
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-                bottomLeft: isSent ? Radius.circular(12) : Radius.circular(0),
-                bottomRight: isSent ? Radius.circular(0) : Radius.circular(12),
+                topLeft: const Radius.circular(12),
+                topRight: const Radius.circular(12),
+                bottomLeft: isSent
+                    ? const Radius.circular(12)
+                    : const Radius.circular(0),
+                bottomRight: isSent
+                    ? const Radius.circular(0)
+                    : const Radius.circular(12),
               ),
             ),
             child: Text(

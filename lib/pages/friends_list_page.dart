@@ -28,7 +28,6 @@ class _FriendsListPageState extends State<FriendsListPage> {
 
   Future<void> _loadFriends() async {
     List<String> friendsList = await loadFriends();
-
     setState(() {
       _friends = friendsList
           .map((friend) => jsonDecode(friend) as Map<String, dynamic>)
@@ -46,6 +45,48 @@ class _FriendsListPageState extends State<FriendsListPage> {
     setState(() {
       _friends.removeAt(index);
     });
+  }
+
+  Future<void> _showEditNameDialog(int index) async {
+    TextEditingController nameController =
+        TextEditingController(text: _friends[index]['name']);
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // user must tap button!
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Edit Friend\'s Name'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Friend\'s Name',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Save'),
+              onPressed: () {
+                _selectNewName(index, nameController.text);
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _showDeleteConfirmationDialog(int index) async {
@@ -102,6 +143,17 @@ class _FriendsListPageState extends State<FriendsListPage> {
 
       setState(() {});
     }
+  }
+
+  Future<void> _selectNewName(int index, String name) async {
+    _friends[index]['name'] = name;
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> friendsList =
+        _friends.map((friend) => jsonEncode(friend)).toList().cast<String>();
+    await prefs.setStringList('friends', friendsList);
+
+    setState(() {});
   }
 
   Future<void> _showConfirmNewPhotoDialog(int index) async {
@@ -179,10 +231,12 @@ class _FriendsListPageState extends State<FriendsListPage> {
                           MaterialPageRoute(
                             builder: (context) => ChatPage(
                               friendName: friend['name'],
-                              friendAvatar: friend['photoPath'],
                             ),
                           ),
                         );
+                      },
+                      onLongPress: () async {
+                        await _showEditNameDialog(index);
                       },
                     ),
                   );

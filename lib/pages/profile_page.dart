@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_maps_example/pages/home_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/nostr.dart';
+import '../utils/friends.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -59,6 +61,36 @@ class _ProfilePageState extends State<ProfilePage> {
                 }
               },
               child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _removeAllFriends() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Remove All Friends?'),
+          content: const Text(
+              'Are you sure you want to remove all of your friends? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                removeAllFriends();
+                Navigator.pop(context); // Close the dialog
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomePage()),
+                );
+              },
+              child: const Text('Remove'),
             ),
           ],
         );
@@ -186,12 +218,24 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(50.0),
-        child: ElevatedButton(
-          onPressed: _resetAndCloseApp,
-          child: const Text('Delete All Data'),
-          style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.all<Color>(Colors.red),
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ElevatedButton(
+              onPressed: _removeAllFriends,
+              child: const Text('Remove All Friends'),
+              style: ButtonStyle(
+                backgroundColor: MaterialStateProperty.all<Color>(Colors.red),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: _resetAndCloseApp,
+              child: const Text('Delete All Data'),
+              style: ButtonStyle(
+                backgroundColor: MaterialStateProperty.all<Color>(Colors.red),
+              ),
+            ),
+          ],
         ),
       ),
     );

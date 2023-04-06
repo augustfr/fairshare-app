@@ -2,13 +2,13 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_vibrate/flutter_vibrate.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../utils/nostr.dart';
+import '../utils/friends.dart';
 
 const loopTime = 10; //in seconds
 
@@ -72,42 +72,18 @@ class _QRScannerPageState extends State<QRScannerPage> {
       "privateKey": privateKey
     };
     String jsonString = json.encode(jsonMap);
-    _addFriend(jsonString, photoPath);
-  }
-
-  Future<bool> _addFriend(String rawData, String? photoPath) async {
-    final Map<String, dynamic> friendData = jsonDecode(rawData);
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-
-    List<String> friendsList = prefs.getStringList('friends') ?? [];
-    // Check if the friend is already in the list
-    for (String friend in friendsList) {
-      final Map<String, dynamic> existingFriend = jsonDecode(friend);
-      if (existingFriend['privateKey'] == friendData['privateKey']) {
-        return false; // Friend is already in the list
-      }
-    }
-
-    // Add the photo path to the friend data
-    if (photoPath != null) {
-      friendData['photoPath'] = photoPath;
-    }
-
-    // Add the current location to the friend data
-    List<double> currentLocation = [37.792520, -122.440140];
-    friendData['currentLocation'] = currentLocation;
-
-    friendsList.add(jsonEncode(friendData));
-
-    await prefs.setStringList('friends', friendsList);
-    Vibrate.feedback(FeedbackType.success);
-    return true; // Friend added successfully
+    addFriend(jsonString, photoPath);
   }
 
   void _toggleScan() {
     setState(() {
       _isScanning = !_isScanning;
     });
+    if (_isScanning) {
+      cameraController.start();
+    } else {
+      cameraController.stop();
+    }
   }
 
   bool _isValidQRData(String? rawData) {
@@ -220,12 +196,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     onPressed: _toggleScan,
                     child: Text(_isScanning ? 'Stop Scanning' : 'Scan'),
                   ),
-                  // ElevatedButton(
-                  //   onPressed: () async {
-                  //     await postToNostr(_privateKey, 'Gene');
-                  //   },
-                  //   child: const Text('Debug scanned'),
-                  // ),
                   Visibility(
                     visible: _isScanning,
                     child: SizedBox(
@@ -243,6 +213,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                             for (final barcode in barcodes) {
                               if (barcode.rawValue != _previousBarcodeValue &&
                                   _isValidQRData(barcode.rawValue)) {
+                                _toggleScan(); // Close the scanner immediately
                                 final Map<String, dynamic> friendData =
                                     jsonDecode(barcode.rawValue!);
                                 final String friendName = friendData['name'];
@@ -261,9 +232,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                       friendName,
                                       friendData['privateKey'],
                                       CameraDevice.rear);
-                                  bool isAdded = await _addFriend(
+                                  bool isAdded = await addFriend(
                                       barcode.rawValue!, photoPath);
-                                  _toggleScan();
                                   setState(() {
                                     if (isAdded) {
                                       qrResult =
