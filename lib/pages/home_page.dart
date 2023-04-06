@@ -11,6 +11,7 @@ import './friends_list_page.dart';
 import './qr_scanner.dart';
 import '../utils/nostr.dart';
 import '../utils/friends.dart';
+import '../utils/location.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -54,10 +55,12 @@ class _HomePageState extends State<HomePage> {
 
   // Method to get current location
   Future<CameraPosition> _getCurrentLocation() async {
-    final location = Location();
-    final currentLocation = await location.getLocation();
-    final latLng =
-        LatLng(currentLocation.latitude!, currentLocation.longitude!);
+    final latLng = await getCurrentLocation();
+
+    // Save current location in SharedPreferences
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('current_latitude', latLng.latitude);
+    await prefs.setDouble('current_longitude', latLng.longitude);
 
     return CameraPosition(target: latLng, zoom: 14.4746);
   }

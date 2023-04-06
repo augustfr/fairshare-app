@@ -27,9 +27,9 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
     friendData['photoPath'] = photoPath;
   }
 
-  // Add the current location to the friend data
-  List<double> currentLocation = [37.792520, -122.440140];
-  friendData['currentLocation'] = currentLocation;
+  // // Add the current location to the friend data
+  // List<double> currentLocation = [37.792520, -122.440140];
+  // friendData['currentLocation'] = currentLocation;
 
   friendsList.add(jsonEncode(friendData));
 
