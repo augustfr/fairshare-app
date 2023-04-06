@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/nostr.dart';
@@ -20,18 +21,71 @@ class ChatPage extends StatefulWidget {
 class Message {
   final String text;
   final String globalKey;
+  final int timestamp;
 
-  Message(this.text, this.globalKey);
+  Message(this.text, this.globalKey, this.timestamp);
 }
 
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _textController = TextEditingController();
   final List<Message> _messages = [];
+  late Timer _timer;
+  String _myGlobalKey = ''; // added state variable
+  final ScrollController _scrollController = ScrollController();
+
+  bool _keyboardVisible = false;
 
   @override
   void initState() {
     super.initState();
-    _startListeningToEvents(publicKeys: [getPublicKey(widget.sharedKey)]);
+    _initializeEventListeningAndFetchEvents(widget.sharedKey);
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _initializeEventListeningAndFetchEvents(widget.sharedKey);
+    });
+    _getGlobalKey().then((value) {
+      setState(() {
+        _myGlobalKey = value;
+      });
+    });
+  }
+
+  Future<void> _initializeEventListeningAndFetchEvents(String sharedKey) async {
+    String publicKey = getPublicKey(sharedKey);
+    List<dynamic> events = await getPreviousEvents(publicKeys: [publicKey]);
+    List<Message> fetchedMessages = [];
+
+    for (dynamic event in events) {
+      Map<String, dynamic> eventData = jsonDecode(event);
+
+      if (eventData['message'] == null ||
+          eventData['global_key'] == null ||
+          eventData['timestamp'] == null) {
+        continue;
+      }
+
+      String message = eventData['message'];
+      String globalKey = eventData['global_key'];
+      int timestamp = eventData['timestamp'];
+
+      fetchedMessages.add(Message(message, globalKey, timestamp));
+    }
+
+    // Sort messages by timestamp
+    fetchedMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    // Clear existing messages and update UI with the fetched messages
+    setState(() {
+      _messages.clear();
+      _messages.addAll(fetchedMessages);
+    });
+
+    if (!_keyboardVisible) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   Future<String> _getGlobalKey() async {
@@ -39,29 +93,38 @@ class _ChatPageState extends State<ChatPage> {
     return prefs.getString('global_key') ?? '';
   }
 
-  void _startListeningToEvents({required List<String> publicKeys}) {
-    startListeningToEvents(publicKeys: publicKeys);
-    // Add the code to listen to Nostr events and update the _messages list
-    // when new messages arrive.
-  }
-
   void _sendMessage(String text) async {
     String globalKey = await _getGlobalKey();
     if (text.trim().isNotEmpty) {
+      int timestamp = DateTime.now().millisecondsSinceEpoch;
+
       setState(() {
-        _messages.add(Message(text.trim(), globalKey));
+        _messages.add(Message(text.trim(), globalKey, timestamp));
       });
+
       _textController.clear();
 
-      int timestamp = DateTime.now().millisecondsSinceEpoch;
       String content = jsonEncode({
         'global_key': globalKey,
         'message': text.trim(),
         'timestamp': timestamp,
       });
 
+      // String testContent = jsonEncode({
+      //   'global_key': '123123',
+      //   'message': 'reponse',
+      //   'timestamp': timestamp + 5,
+      // });
+
       postToNostr(widget.sharedKey, content);
+      //postToNostr(widget.sharedKey, testContent);
     }
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
   }
 
   @override
@@ -74,26 +137,37 @@ class _ChatPageState extends State<ChatPage> {
         child: Column(
           children: [
             Expanded(
-              child: FutureBuilder<String>(
-                future: _getGlobalKey(),
-                builder:
-                    (BuildContext context, AsyncSnapshot<String> snapshot) {
-                  if (snapshot.hasData) {
-                    String myGlobalKey = snapshot.data!;
-                    return ListView.builder(
-                      itemCount: _messages.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        return ChatBubble(
-                          text: _messages[index].text,
-                          globalKey: _messages[index].globalKey,
-                          myGlobalKey: myGlobalKey,
-                        );
-                      },
-                    );
-                  } else {
-                    return const Center(child: CircularProgressIndicator());
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  // Detect keyboard visibility based on scroll position
+                  final pixels = notification.metrics.pixels;
+                  final maxScrollExtent = notification.metrics.maxScrollExtent;
+                  final minScrollExtent = notification.metrics.minScrollExtent;
+                  final inScrollArea =
+                      pixels < maxScrollExtent && pixels > minScrollExtent;
+                  final isScrolling =
+                      notification is ScrollUpdateNotification ||
+                          notification is OverscrollNotification;
+                  final visible = isScrolling || inScrollArea;
+                  if (_keyboardVisible != visible) {
+                    setState(() {
+                      _keyboardVisible = visible;
+                    });
                   }
+                  return false;
                 },
+                child: ListView.builder(
+                  controller: _scrollController,
+                  itemCount: _messages.length,
+                  addAutomaticKeepAlives: true,
+                  itemBuilder: (BuildContext context, int index) {
+                    return ChatBubble(
+                      text: _messages[index].text,
+                      globalKey: _messages[index].globalKey,
+                      myGlobalKey: _myGlobalKey,
+                    );
+                  },
+                ),
               ),
             ),
             Container(
