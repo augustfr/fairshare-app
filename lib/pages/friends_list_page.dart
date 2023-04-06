@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -28,11 +29,46 @@ class _FriendsListPageState extends State<FriendsListPage> {
 
   Future<void> _loadFriends() async {
     List<String> friendsList = await loadFriends();
+    List<double> myCurrentLocation = [
+      37.7749,
+      -122.4194
+    ]; // Replace this with your actual current location
+
     setState(() {
-      _friends = friendsList
-          .map((friend) => jsonDecode(friend) as Map<String, dynamic>)
-          .toList();
+      _friends = friendsList.map((friend) {
+        Map<String, dynamic> decodedFriend =
+            jsonDecode(friend) as Map<String, dynamic>;
+        List<double> friendLocation =
+            decodedFriend['currentLocation'].cast<double>();
+        String distance = getDistance(myCurrentLocation, friendLocation);
+        decodedFriend['distance'] = distance;
+        return decodedFriend;
+      }).toList();
     });
+  }
+
+  String getDistance(List<double> myLocation, List<double> friendLocation) {
+    const double earthRadius = 3958.8; // Earth radius in miles
+
+    double toRadians(double degree) {
+      return degree * pi / 180.0;
+    }
+
+    double lat1 = toRadians(myLocation[0]);
+    double lon1 = toRadians(myLocation[1]);
+    double lat2 = toRadians(friendLocation[0]);
+    double lon2 = toRadians(friendLocation[1]);
+
+    double deltaLat = lat2 - lat1;
+    double deltaLon = lon2 - lon1;
+
+    double a = pow(sin(deltaLat / 2), 2) +
+        cos(lat1) * cos(lat2) * pow(sin(deltaLon / 2), 2);
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    double distance = earthRadius * c;
+
+    return distance.toStringAsFixed(1) + 'm';
   }
 
   Future<void> _removeFriend(int index) async {
@@ -224,7 +260,7 @@ class _FriendsListPageState extends State<FriendsListPage> {
                         ),
                       ),
                       title: Text(friend['name']),
-                      subtitle: Text('0.${index + 1}m'),
+                      subtitle: Text(friend['distance']),
                       onTap: () {
                         Navigator.push(
                           context,

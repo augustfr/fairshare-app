@@ -21,7 +21,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   GoogleMapController? _controller;
-  Set<Marker> _markers = {}; // Add this line to store markers
+  final Set<Marker> _markers = {}; // Add this line to store markers
+
+  List<double> myCurrentLocation = [0.0, 0.0]; // Default value
 
   late Future<CameraPosition> _initialCameraPosition;
 
@@ -32,7 +34,12 @@ class _HomePageState extends State<HomePage> {
 
     _locationSubscription =
         location.onLocationChanged.listen((LocationData currentLocation) {
-      // on location update do something
+      setState(() {
+        myCurrentLocation = [
+          currentLocation.latitude ?? 0.0,
+          currentLocation.longitude ?? 0.0,
+        ];
+      });
     });
   }
 
