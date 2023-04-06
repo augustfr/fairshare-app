@@ -108,21 +108,21 @@ class _HomePageState extends State<HomePage> {
       Set<Marker> updatedMarkers = {};
       for (var friendJson in friendsList) {
         Map<String, dynamic> friendData = jsonDecode(friendJson);
-        List<dynamic>? currentLocation = friendData['currentLocation'];
+        String locationString = friendData['currentLocation'];
+        List<String> latLngStrings =
+            locationString.substring(7, locationString.length - 1).split(', ');
+        double latitude = double.parse(latLngStrings[0]);
+        double longitude = double.parse(latLngStrings[1]);
+        LatLng friendLatLng = LatLng(latitude, longitude);
         String? friendName = friendData['name'];
-        if (currentLocation != null &&
-            currentLocation.length == 2 &&
-            friendName != null) {
-          LatLng friendLatLng = LatLng(currentLocation[0], currentLocation[1]);
-          updatedMarkers.add(
-            Marker(
-              markerId: MarkerId(friendName),
-              position: friendLatLng,
-              infoWindow: InfoWindow(title: friendName),
-              icon: customMarkerIcon, // Use the custom marker icon
-            ),
-          );
-        }
+        updatedMarkers.add(
+          Marker(
+            markerId: MarkerId(friendName ?? 'Anonymous'),
+            position: friendLatLng,
+            infoWindow: InfoWindow(title: friendName),
+            icon: customMarkerIcon, // Use the custom marker icon
+          ),
+        );
       }
 
       // Update the _markers set with the updated markers

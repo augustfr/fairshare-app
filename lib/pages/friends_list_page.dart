@@ -6,11 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import './chat_page.dart';
 import './profile_page.dart';
 import '../utils/friends.dart';
-import './chat_page.dart';
+import '../utils/location.dart';
 
 class FriendsListPage extends StatefulWidget {
   const FriendsListPage({Key? key}) : super(key: key);
@@ -30,35 +31,37 @@ class _FriendsListPageState extends State<FriendsListPage> {
 
   Future<void> _loadFriends() async {
     List<String> friendsList = await loadFriends();
-    List<double> myCurrentLocation = [
-      37.7749,
-      -122.4194
-    ]; // Replace this with your actual current location
+    LatLng savedLocation = await getSavedLocation();
 
     setState(() {
       _friends = friendsList.map((friend) {
         Map<String, dynamic> decodedFriend =
             jsonDecode(friend) as Map<String, dynamic>;
-        List<double> friendLocation =
-            decodedFriend['currentLocation'].cast<double>();
-        String distance = getDistance(myCurrentLocation, friendLocation);
+        String locationString = decodedFriend['currentLocation'];
+        List<String> latLngStrings =
+            locationString.substring(7, locationString.length - 1).split(', ');
+        double latitude = double.parse(latLngStrings[0]);
+        double longitude = double.parse(latLngStrings[1]);
+        LatLng friendLatLng = LatLng(latitude, longitude);
+
+        String distance = getDistance(savedLocation, friendLatLng);
         decodedFriend['distance'] = distance;
         return decodedFriend;
       }).toList();
     });
   }
 
-  String getDistance(List<double> myLocation, List<double> friendLocation) {
+  String getDistance(LatLng myLocation, LatLng friendLocation) {
     const double earthRadius = 3958.8; // Earth radius in miles
 
     double toRadians(double degree) {
       return degree * pi / 180.0;
     }
 
-    double lat1 = toRadians(myLocation[0]);
-    double lon1 = toRadians(myLocation[1]);
-    double lat2 = toRadians(friendLocation[0]);
-    double lon2 = toRadians(friendLocation[1]);
+    double lat1 = toRadians(myLocation.latitude);
+    double lon1 = toRadians(myLocation.longitude);
+    double lat2 = toRadians(friendLocation.latitude);
+    double lon2 = toRadians(friendLocation.longitude);
 
     double deltaLat = lat2 - lat1;
     double deltaLon = lon2 - lon1;

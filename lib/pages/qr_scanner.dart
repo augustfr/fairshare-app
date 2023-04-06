@@ -75,17 +75,21 @@ class _QRScannerPageState extends State<QRScannerPage> {
       _currentLocationString = currentLocationString;
     });
     String event = await listenForConfirm(publicKey: pubKey);
-    String friendName = getContent(event);
+    Map<String, dynamic> content = json.decode(getContent(event));
+
+    String friendName = content['name'];
+    String friendLocation = content['currentLocation'];
     String? photoPath =
         await _promptForPhoto(friendName, privateKey, CameraDevice.rear);
     Map<String, String> jsonMap = {
       "name": friendName,
-      "privateKey": privateKey
+      "privateKey": privateKey,
+      "currentLocation": friendLocation
     };
     String jsonString = json.encode(jsonMap);
-    bool isAdded = await addFriend(jsonString, photoPath);
-    if (isAdded) {
-      return jsonString; // Return the rawData if the friend is added
+    bool test = await addFriend(jsonString, photoPath);
+    if (test) {
+      widget.onQRScanSuccess();
     }
     return null;
   }
@@ -260,14 +264,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                       friendName,
                                       friendData['privateKey'],
                                       CameraDevice.rear);
-                                  bool isAdded = await addFriend(
-                                      barcode.rawValue!, photoPath);
-                                  setState(() {
-                                    if (isAdded) {
-                                      qrResult =
-                                          '$friendName has been added as a friend!';
-                                    }
-                                  });
+                                  await addFriend(barcode.rawValue!, photoPath);
                                 } else {
                                   _toggleScan();
                                   setState(() {
@@ -275,9 +272,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                         '$friendName is already your friend!';
                                   });
                                 }
-
-                                debugPrint(
-                                    'QR code found! ${barcode.rawValue}');
                                 _previousBarcodeValue = barcode.rawValue;
                                 widget.onQRScanSuccess();
                               }
