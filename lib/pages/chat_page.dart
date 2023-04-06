@@ -1,24 +1,66 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/nostr.dart';
 
 class ChatPage extends StatefulWidget {
   final String friendName;
+  final String sharedKey;
 
-  const ChatPage({Key? key, required this.friendName}) : super(key: key);
+  const ChatPage({
+    Key? key,
+    required this.friendName,
+    required this.sharedKey,
+  }) : super(key: key);
 
   @override
   _ChatPageState createState() => _ChatPageState();
 }
 
+class Message {
+  final String text;
+  final String globalKey;
+
+  Message(this.text, this.globalKey);
+}
+
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _textController = TextEditingController();
-  final List<String> _messages = [];
+  final List<Message> _messages = [];
 
-  void _sendMessage(String text) {
+  @override
+  void initState() {
+    super.initState();
+    _startListeningToEvents(publicKeys: [getPublicKey(widget.sharedKey)]);
+  }
+
+  Future<String> _getGlobalKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('global_key') ?? '';
+  }
+
+  void _startListeningToEvents({required List<String> publicKeys}) {
+    startListeningToEvents(publicKeys: publicKeys);
+    // Add the code to listen to Nostr events and update the _messages list
+    // when new messages arrive.
+  }
+
+  void _sendMessage(String text) async {
+    String globalKey = await _getGlobalKey();
     if (text.trim().isNotEmpty) {
       setState(() {
-        _messages.add(text.trim());
+        _messages.add(Message(text.trim(), globalKey));
       });
       _textController.clear();
+
+      int timestamp = DateTime.now().millisecondsSinceEpoch;
+      String content = jsonEncode({
+        'global_key': globalKey,
+        'message': text.trim(),
+        'timestamp': timestamp,
+      });
+
+      postToNostr(widget.sharedKey, content);
     }
   }
 
@@ -32,14 +74,25 @@ class _ChatPageState extends State<ChatPage> {
         child: Column(
           children: [
             Expanded(
-              child: ListView.builder(
-                itemCount: _messages.length,
-                itemBuilder: (BuildContext context, int index) {
-                  return ChatBubble(
-                    text: _messages[index],
-                    isSent:
-                        true, // Set to true since only the user can send messages
-                  );
+              child: FutureBuilder<String>(
+                future: _getGlobalKey(),
+                builder:
+                    (BuildContext context, AsyncSnapshot<String> snapshot) {
+                  if (snapshot.hasData) {
+                    String myGlobalKey = snapshot.data!;
+                    return ListView.builder(
+                      itemCount: _messages.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        return ChatBubble(
+                          text: _messages[index].text,
+                          globalKey: _messages[index].globalKey,
+                          myGlobalKey: myGlobalKey,
+                        );
+                      },
+                    );
+                  } else {
+                    return const Center(child: CircularProgressIndicator());
+                  }
                 },
               ),
             ),
@@ -80,13 +133,19 @@ class _ChatPageState extends State<ChatPage> {
 
 class ChatBubble extends StatelessWidget {
   final String text;
-  final bool isSent;
+  final String globalKey;
+  final String myGlobalKey;
 
-  const ChatBubble({Key? key, required this.text, required this.isSent})
+  const ChatBubble(
+      {Key? key,
+      required this.text,
+      required this.globalKey,
+      required this.myGlobalKey})
       : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    bool isSent = globalKey == myGlobalKey;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
       child: Row(

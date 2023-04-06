@@ -13,13 +13,15 @@ import '../utils/friends.dart';
 const loopTime = 10; //in seconds
 
 class QRScannerPage extends StatefulWidget {
-  final VoidCallback onQRScanSuccess;
+  final Function onQRScanSuccess;
 
-  const QRScannerPage({Key? key, required this.onQRScanSuccess})
-      : super(key: key);
+  const QRScannerPage({
+    Key? key,
+    required this.onQRScanSuccess,
+  }) : super(key: key);
 
   @override
-  _QRScannerPageState createState() => _QRScannerPageState();
+  State<QRScannerPage> createState() => _QRScannerPageState();
 }
 
 class _QRScannerPageState extends State<QRScannerPage> {
@@ -40,6 +42,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
     _timer = Timer.periodic(const Duration(seconds: loopTime), (timer) async {
       await _updateKey();
     });
+    _updateKey(); // Call _updateKey here
   }
 
   @override
@@ -57,7 +60,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
     });
   }
 
-  Future<void> _updateKey() async {
+  Future<String?> _updateKey() async {
     String privateKey = generateRandomPrivateKey();
     String pubKey = getPublicKey(privateKey);
     setState(() {
@@ -72,7 +75,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
       "privateKey": privateKey
     };
     String jsonString = json.encode(jsonMap);
-    addFriend(jsonString, photoPath);
+    bool isAdded = await addFriend(jsonString, photoPath);
+    if (isAdded) {
+      return jsonString; // Return the rawData if the friend is added
+    }
+    return null;
   }
 
   void _toggleScan() {

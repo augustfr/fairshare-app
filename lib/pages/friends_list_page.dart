@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import './chat_page.dart';
 import './profile_page.dart';
 import '../utils/friends.dart';
+import './chat_page.dart';
 
 class FriendsListPage extends StatefulWidget {
   const FriendsListPage({Key? key}) : super(key: key);
@@ -81,6 +82,7 @@ class _FriendsListPageState extends State<FriendsListPage> {
     setState(() {
       _friends.removeAt(index);
     });
+    Navigator.pop(context, true);
   }
 
   Future<void> _showEditNameDialog(int index) async {
@@ -267,6 +269,7 @@ class _FriendsListPageState extends State<FriendsListPage> {
                           MaterialPageRoute(
                             builder: (context) => ChatPage(
                               friendName: friend['name'],
+                              sharedKey: friend['privateKey'],
                             ),
                           ),
                         );

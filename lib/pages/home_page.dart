@@ -101,6 +101,8 @@ class _HomePageState extends State<HomePage> {
       BitmapDescriptor customMarkerIcon =
           await _createCircleMarkerIcon(Colors.red, 20);
 
+      // Create a set of markers for existing friends
+      Set<Marker> updatedMarkers = {};
       for (var friendJson in friendsList) {
         Map<String, dynamic> friendData = jsonDecode(friendJson);
         List<dynamic>? currentLocation = friendData['currentLocation'];
@@ -109,18 +111,22 @@ class _HomePageState extends State<HomePage> {
             currentLocation.length == 2 &&
             friendName != null) {
           LatLng friendLatLng = LatLng(currentLocation[0], currentLocation[1]);
-          setState(() {
-            _markers.add(
-              Marker(
-                markerId: MarkerId(friendName),
-                position: friendLatLng,
-                infoWindow: InfoWindow(title: friendName),
-                icon: customMarkerIcon, // Use the custom marker icon
-              ),
-            );
-          });
+          updatedMarkers.add(
+            Marker(
+              markerId: MarkerId(friendName),
+              position: friendLatLng,
+              infoWindow: InfoWindow(title: friendName),
+              icon: customMarkerIcon, // Use the custom marker icon
+            ),
+          );
         }
       }
+
+      // Update the _markers set with the updated markers
+      setState(() {
+        _markers.clear();
+        _markers.addAll(updatedMarkers);
+      });
     } catch (e) {
       print('Error fetching friends locations: $e');
     }
@@ -159,12 +165,16 @@ class _HomePageState extends State<HomePage> {
                     top: 40,
                     right: 10,
                     child: RawMaterialButton(
-                      onPressed: () {
-                        Navigator.push(
+                      onPressed: () async {
+                        bool? friendsListUpdated = await Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => const FriendsListPage()),
+                            builder: (context) => const FriendsListPage(),
+                          ),
                         );
+                        if (friendsListUpdated == true) {
+                          _fetchFriendsLocations();
+                        }
                       },
                       shape: const CircleBorder(),
                       fillColor: Colors.white,
@@ -189,16 +199,16 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   FloatingActionButton(
                     onPressed: () async {
-                      String? qrResult = await Navigator.push(
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => QRScannerPage(
-                                  onQRScanSuccess: () {
-                                    print('QR scan successful.');
-                                  },
-                                )),
+                          builder: (context) => QRScannerPage(
+                            onQRScanSuccess: () {
+                              _fetchFriendsLocations();
+                            },
+                          ),
+                        ),
                       );
-                      if (qrResult != null) {}
                     },
                     child: const Icon(Icons.add),
                   ),
