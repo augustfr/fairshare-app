@@ -289,8 +289,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                   ),
                   const SizedBox(height: 20),
                   Visibility(
-                    visible:
-                        _isLocationAvailable, // Only show the QR code if location data is available
+                    visible: !_isScanning && _isLocationAvailable,
                     child: Center(
                       child: QrImage(
                         data: jsonEncode({
