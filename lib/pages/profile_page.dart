@@ -25,9 +25,6 @@ class _ProfilePageState extends State<ProfilePage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? name = prefs.getString('user_name');
     String? globalKey = prefs.getString('global_key');
-    if (globalKey != null) {
-      postToNostr(globalKey, 'test');
-    }
 
     setState(() {
       _name = name;
