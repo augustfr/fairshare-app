@@ -203,12 +203,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     onPressed: _toggleScan,
                     child: Text(_isScanning ? 'Stop Scanning' : 'Scan'),
                   ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      await postToNostr(_privateKey, 'Gene');
-                    },
-                    child: const Text('Debug scanned'),
-                  ),
+                  // ElevatedButton(
+                  //   onPressed: () async {
+                  //     await postToNostr(_privateKey, 'Gene');
+                  //   },
+                  //   child: const Text('Debug scanned'),
+                  // ),
                   Visibility(
                     visible: _isScanning,
                     child: SizedBox(
