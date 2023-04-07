@@ -43,7 +43,9 @@ Future<void> removeAllFriends() async {
 Future<List<int>> checkForUnreadMessages() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
   List<String> friendsList = await loadFriends();
+  //print(friendsList);
   List<int> friendsWithUnreadMessages = [];
+  String myGlobalKey = prefs.getString('global_key') ?? '';
   for (int i = 0; i < friendsList.length; i++) {
     Map<String, dynamic> decodedFriend =
         jsonDecode(friendsList[i]) as Map<String, dynamic>;
@@ -55,15 +57,18 @@ Future<List<int>> checkForUnreadMessages() async {
       markAsRead: false,
     );
     if (eventsList.isNotEmpty) {
-      int currentTimestamp = getTimestamp(eventsList.last);
-      if ((currentTimestamp > (decodedFriend['latestMessage'] ?? 0))) {
-        decodedFriend['hasUnreadMessages'] = true;
-        friendsWithUnreadMessages.add(i);
+      String globalKey = getGlobalKey(eventsList.first);
+      if (globalKey != myGlobalKey) {
+        int currentMessageTimestamp = getTimestamp(eventsList.first);
+        if (currentMessageTimestamp > (decodedFriend['latestMessage'] ?? 0)) {
+          decodedFriend['hasUnreadMessages'] = true;
+          friendsWithUnreadMessages.add(i);
+        }
       } else {
         decodedFriend['hasUnreadMessages'] = false;
       }
+      friendsList[i] = json.encode(decodedFriend);
     }
-    friendsList[i] = json.encode(decodedFriend);
   }
 
   // Update SharedPreferences
