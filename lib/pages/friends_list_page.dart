@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -22,6 +21,7 @@ class FriendsListPage extends StatefulWidget {
 
 class _FriendsListPageState extends State<FriendsListPage> {
   List<Map<String, dynamic>> _friends = [];
+  Set<int> unreadMessageIndexes = {};
 
   @override
   void initState() {
@@ -32,6 +32,8 @@ class _FriendsListPageState extends State<FriendsListPage> {
   Future<void> _loadFriends() async {
     List<String> friendsList = await loadFriends();
     LatLng savedLocation = await getSavedLocation();
+
+    unreadMessageIndexes = (await checkForUnreadMessages()).toSet();
 
     setState(() {
       _friends = friendsList.map((friend) {
@@ -44,35 +46,12 @@ class _FriendsListPageState extends State<FriendsListPage> {
         double longitude = double.parse(latLngStrings[1]);
         LatLng friendLatLng = LatLng(latitude, longitude);
 
-        String distance = getDistance(savedLocation, friendLatLng);
-        decodedFriend['distance'] = distance;
+        double distance = getDistance(savedLocation, friendLatLng);
+        String distanceString = distance.toString() + 'm';
+        decodedFriend['distance'] = distanceString;
         return decodedFriend;
       }).toList();
     });
-  }
-
-  String getDistance(LatLng myLocation, LatLng friendLocation) {
-    const double earthRadius = 3958.8; // Earth radius in miles
-
-    double toRadians(double degree) {
-      return degree * pi / 180.0;
-    }
-
-    double lat1 = toRadians(myLocation.latitude);
-    double lon1 = toRadians(myLocation.longitude);
-    double lat2 = toRadians(friendLocation.latitude);
-    double lon2 = toRadians(friendLocation.longitude);
-
-    double deltaLat = lat2 - lat1;
-    double deltaLon = lon2 - lon1;
-
-    double a = pow(sin(deltaLat / 2), 2) +
-        cos(lat1) * cos(lat2) * pow(sin(deltaLon / 2), 2);
-    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-
-    double distance = earthRadius * c;
-
-    return distance.toStringAsFixed(1) + 'm';
   }
 
   Future<void> _removeFriend(int index) async {
@@ -236,6 +215,7 @@ class _FriendsListPageState extends State<FriendsListPage> {
                 itemCount: _friends.length,
                 itemBuilder: (BuildContext context, int index) {
                   Map<String, dynamic> friend = _friends[index];
+                  bool hasUnreadMessages = unreadMessageIndexes.contains(index);
                   return Dismissible(
                     key: Key(friend['name']),
                     direction: DismissDirection.endToStart,
@@ -253,33 +233,50 @@ class _FriendsListPageState extends State<FriendsListPage> {
                         ),
                       ),
                     ),
-                    child: ListTile(
-                      leading: InkWell(
-                        onTap: () async {
-                          await _showConfirmNewPhotoDialog(index);
-                        },
-                        child: CircleAvatar(
-                          backgroundImage: friend['photoPath'] == null
-                              ? null
-                              : FileImage(File(friend['photoPath'])),
-                        ),
-                      ),
-                      title: Text(friend['name']),
-                      subtitle: Text(friend['distance']),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ChatPage(
-                              friendName: friend['name'],
-                              sharedKey: friend['privateKey'],
+                    child: Stack(
+                      children: [
+                        ListTile(
+                          leading: InkWell(
+                            onTap: () async {
+                              await _showConfirmNewPhotoDialog(index);
+                            },
+                            child: CircleAvatar(
+                              backgroundImage: friend['photoPath'] == null
+                                  ? null
+                                  : FileImage(File(friend['photoPath'])),
                             ),
                           ),
-                        );
-                      },
-                      onLongPress: () async {
-                        await _showEditNameDialog(index);
-                      },
+                          title: Text(friend['name']),
+                          subtitle: Text(friend['distance']),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatPage(
+                                    friendName: friend['name'],
+                                    sharedKey: friend['privateKey'],
+                                    friendIndex: index),
+                              ),
+                            );
+                          },
+                          onLongPress: () async {
+                            await _showEditNameDialog(index);
+                          },
+                        ),
+                        if (hasUnreadMessages)
+                          Positioned(
+                            bottom: 25,
+                            right: 20,
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: Transform.scale(
+                                scale: 0.5,
+                                child:
+                                    const Icon(Icons.circle, color: Colors.red),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   );
                 },

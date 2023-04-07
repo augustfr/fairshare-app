@@ -7,11 +7,13 @@ import '../utils/nostr.dart';
 class ChatPage extends StatefulWidget {
   final String friendName;
   final String sharedKey;
+  final int friendIndex;
 
   const ChatPage({
     Key? key,
     required this.friendName,
     required this.sharedKey,
+    required this.friendIndex,
   }) : super(key: key);
 
   @override
@@ -38,9 +40,11 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    _initializeEventListeningAndFetchEvents(widget.sharedKey);
+    _initializeEventListeningAndFetchEvents(
+        widget.sharedKey, widget.friendIndex);
     _timer = Timer.periodic(const Duration(seconds: 5), (_) {
-      _initializeEventListeningAndFetchEvents(widget.sharedKey);
+      _initializeEventListeningAndFetchEvents(
+          widget.sharedKey, widget.friendIndex);
     });
     _getGlobalKey().then((value) {
       setState(() {
@@ -49,9 +53,11 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  Future<void> _initializeEventListeningAndFetchEvents(String sharedKey) async {
+  Future<void> _initializeEventListeningAndFetchEvents(
+      String sharedKey, int index) async {
     String publicKey = getPublicKey(sharedKey);
-    List<dynamic> events = await getPreviousEvents(publicKeys: [publicKey]);
+    List<dynamic> events = await getPreviousEvents(
+        publicKeys: [publicKey], friendIndex: index, markAsRead: true);
     List<Message> fetchedMessages = [];
 
     for (dynamic event in events) {

@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter_vibrate/flutter_vibrate.dart';
+import '../utils/nostr.dart';
 
 Future<List<String>> loadFriends() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -37,4 +38,36 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
 Future<void> removeAllFriends() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
   await prefs.remove('friends');
+}
+
+Future<List<int>> checkForUnreadMessages() async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  List<String> friendsList = await loadFriends();
+  List<int> friendsWithUnreadMessages = [];
+  for (int i = 0; i < friendsList.length; i++) {
+    Map<String, dynamic> decodedFriend =
+        jsonDecode(friendsList[i]) as Map<String, dynamic>;
+    String publicKey = getPublicKey(decodedFriend['privateKey']);
+
+    List<String> eventsList = await getPreviousEvents(
+      publicKeys: [publicKey],
+      friendIndex: i,
+      markAsRead: false,
+    );
+    if (eventsList.isNotEmpty) {
+      int currentTimestamp = getTimestamp(eventsList.last);
+      if ((currentTimestamp > (decodedFriend['latestMessage'] ?? 0))) {
+        decodedFriend['hasUnreadMessages'] = true;
+        friendsWithUnreadMessages.add(i);
+      } else {
+        decodedFriend['hasUnreadMessages'] = false;
+      }
+    }
+    friendsList[i] = json.encode(decodedFriend);
+  }
+
+  // Update SharedPreferences
+  prefs.setStringList('friends', friendsList);
+
+  return friendsWithUnreadMessages;
 }

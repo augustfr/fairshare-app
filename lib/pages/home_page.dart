@@ -25,6 +25,7 @@ class _HomePageState extends State<HomePage> {
   final Set<Marker> _markers = {}; // Add this line to store markers
 
   LatLng myCurrentLocation = const LatLng(0.0, 0.0); // Default value
+  List<int> unreadFriendIndexes = [];
 
   late Future<CameraPosition> _initialCameraPosition;
 
@@ -35,6 +36,7 @@ class _HomePageState extends State<HomePage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     double latitude = prefs.getDouble('current_latitude') ?? 0.0;
     double longitude = prefs.getDouble('current_longitude') ?? 0.0;
+    LatLng oldLocation = LatLng(latitude, longitude);
 
     _locationSubscription =
         location.onLocationChanged.listen((LocationData currentLocation) async {
@@ -45,22 +47,29 @@ class _HomePageState extends State<HomePage> {
       longitude = currentLocation.longitude ?? 0.0;
       await prefs.setDouble('current_latitude', latitude);
       await prefs.setDouble('current_longitude', longitude);
-
+      List<int> _unreadFriendIndexes = await checkForUnreadMessages();
       setState(() {
         myCurrentLocation = LatLng(latitude, longitude);
+        unreadFriendIndexes = _unreadFriendIndexes;
       });
 
       final friendsList = await loadFriends();
 
       String globalKey = prefs.getString('global_key') ?? '';
 
-      for (final friend in friendsList) {
-        Map<String, dynamic> decodedFriend =
-            jsonDecode(friend) as Map<String, dynamic>;
-        String sharedKey = decodedFriend['privateKey'];
-        final content = jsonEncode(
-            {'currentLocation': myCurrentLocation, 'global_key': globalKey});
-        postToNostr(sharedKey, content);
+      // Check if the distance between the old and new locations is greater than or equal to 0.1 miles
+      double distance = getDistance(oldLocation, myCurrentLocation);
+      if (distance >= 0.1) {
+        for (final friend in friendsList) {
+          Map<String, dynamic> decodedFriend =
+              jsonDecode(friend) as Map<String, dynamic>;
+          String sharedKey = decodedFriend['privateKey'];
+          final content = jsonEncode(
+              {'currentLocation': myCurrentLocation, 'global_key': globalKey});
+          postToNostr(sharedKey, content);
+        }
+        // Update oldLocation to myCurrentLocation after posting to Nostr
+        oldLocation = myCurrentLocation;
       }
     });
   }
@@ -70,8 +79,8 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _initialCameraPosition = _getCurrentLocation();
     _checkFirstTimeUser();
-    _subscribeToLocationUpdates();
-    _fetchFriendsLocations();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _subscribeToLocationUpdates());
   }
 
   // Method to get current location
@@ -121,65 +130,47 @@ class _HomePageState extends State<HomePage> {
   void _fetchFriendsLocations() async {
     BitmapDescriptor customMarkerIcon =
         await _createCircleMarkerIcon(Colors.red, 20);
-
     Set<Marker> updatedMarkers = {};
-
     List<String> friendsList = await loadFriends();
+
     for (var friendJson in friendsList) {
       Map<String, dynamic> friendData = jsonDecode(friendJson);
       String? friendName = friendData['name'];
       String pubicKey = getPublicKey(friendData['privateKey']);
       final friendLocation =
           await getFriendsLastLocation(publicKeys: [pubicKey]);
-
+      double? latitude;
+      double? longitude;
       if (friendLocation != null) {
         Map<String, dynamic> parsedJson = jsonDecode(friendLocation);
-
         // Check if the global_key in the event matches globalKey
         final prefs = await SharedPreferences.getInstance();
         String globalKey = prefs.getString('global_key') ?? '';
+
         if (parsedJson['global_key'] != globalKey) {
-          // Use the shared_preferences friendData['currentLocation'] in this scenario
-          List<double> currentLocation =
-              parseLatLngFromString(friendData['currentLocation']);
-
-          double? latitude = currentLocation[0];
-          double? longitude = currentLocation[1];
-
-          updatedMarkers.add(
-            Marker(
-              markerId: MarkerId(friendName ?? 'Anonymous'),
-              position: LatLng(latitude, longitude),
-              infoWindow: InfoWindow(title: friendName ?? 'Anonymous'),
-              icon: customMarkerIcon,
-            ),
-          );
+          friendData['currentLocation'] ??= '';
         } else {
-          List<double> currentLocation =
-              parsedJson['currentLocation'].cast<double>();
-
-          double? latitude = currentLocation[0];
-          double? longitude = currentLocation[1];
-
-          updatedMarkers.add(
-            Marker(
-              markerId: MarkerId(friendName ?? 'Anonymous'),
-              position: LatLng(latitude, longitude),
-              infoWindow: InfoWindow(title: friendName ?? 'Anonymous'),
-              icon: customMarkerIcon,
-            ),
-          );
-
-          // Update the friend's current location
-          friendData['currentLocation'] = 'LatLng($latitude, $longitude)';
-
-          // Find the index of the friendJson in the friendsList
-          int friendIndex = friendsList.indexOf(friendJson);
-
-          // Update the friendJson in the friendsList
-          friendsList[friendIndex] = jsonEncode(friendData);
+          friendData['currentLocation'] =
+              parsedJson['currentLocation'].cast<double>().toString();
         }
       }
+
+      List<double> currentLocation =
+          parseLatLngFromString(friendData['currentLocation']);
+      latitude = currentLocation[0];
+      longitude = currentLocation[1];
+
+      updatedMarkers.add(
+        Marker(
+          markerId: MarkerId(friendName ?? 'Anonymous'),
+          position: LatLng(latitude, longitude),
+          infoWindow: InfoWindow(title: friendName ?? 'Anonymous'),
+          icon: customMarkerIcon,
+        ),
+      );
+
+      friendData['currentLocation'] = 'LatLng($latitude, $longitude)';
+      friendsList[friendsList.indexOf(friendJson)] = jsonEncode(friendData);
     }
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -254,7 +245,24 @@ class _HomePageState extends State<HomePage> {
                         width: 56,
                         height: 56,
                       ),
-                      child: const Icon(Icons.menu, color: Colors.black),
+                      child: Stack(
+                        children: [
+                          const Icon(Icons.menu, color: Colors.black),
+                          if (unreadFriendIndexes.isNotEmpty)
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

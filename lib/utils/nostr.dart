@@ -36,9 +36,14 @@ void startListeningToEvents({required List<String> publicKeys}) async {
   });
 }
 
+//used specifically for getting messages
 Future<List<String>> getPreviousEvents(
-    {required List<String> publicKeys}) async {
+    {required List<String> publicKeys,
+    required int friendIndex,
+    required bool markAsRead}) async {
   Completer<List<String>> eventsCompleter = Completer();
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  List<String> friendsList = prefs.getStringList('friends') ?? [];
   List<String> eventsList = [];
 
   // Create a subscription message request with filters
@@ -65,30 +70,44 @@ Future<List<String>> getPreviousEvents(
 
   // Listen for events from the WebSocket server
   webSocket.listen((event) {
-    //print('Received event: $event');
     if (event.contains('global_key')) {
       String content = getContent(event);
       if (content.contains('timestamp')) {
         eventsList.add(content);
+        // Update latestMessage if necessary
+        int currentTimestamp = getTimestamp(content);
+        Map<String, dynamic> friendData = json.decode(friendsList[friendIndex]);
+        if ((currentTimestamp > (friendData['latestMessage'] ?? 0)) &&
+            markAsRead) {
+          friendData['latestMessage'] = currentTimestamp;
+          friendsList[friendIndex] = json.encode(friendData);
+          prefs.setStringList('friends', friendsList);
+        }
       }
     }
 
     // Check if the event contains the string "EOSE"
     if (event.contains('EOSE')) {
-      // Close the WebSocket and complete the eventsCompleter
       webSocket.close().then((_) {
-        timer.cancel(); // Cancel the timer when the connection is closed
+        timer.cancel();
         eventsCompleter.complete(eventsList);
       });
     }
   }, onDone: () {
     if (!eventsCompleter.isCompleted) {
-      timer.cancel(); // Cancel the timer when the connection is closed
+      timer.cancel();
       eventsCompleter.complete(eventsList);
     }
   });
 
   return eventsCompleter.future;
+}
+
+int getTimestamp(String content) {
+  Map<String, dynamic> contentMap = jsonDecode(content);
+  int timestamp = contentMap['timestamp'] ??
+      0; // Provide a default value of 0 if timestamp is null
+  return timestamp;
 }
 
 Future<String?> getFriendsLastLocation({
@@ -203,6 +222,7 @@ String getPublicKey(privateKey) {
 }
 
 Future<void> postToNostr(String privateKey, String content) async {
+  print('Posting to Nostr: ' + content);
   // Instantiate an event with a partial data and let the library sign the event with your private key
   Event eventToSend =
       Event.from(kind: 1, tags: [], content: content, privkey: privateKey);
