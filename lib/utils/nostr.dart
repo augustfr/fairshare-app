@@ -110,6 +110,12 @@ int getTimestamp(String content) {
   return timestamp;
 }
 
+String getGlobalKey(String content) {
+  Map<String, dynamic> contentMap = jsonDecode(content);
+  String globalKey = contentMap['global_key'];
+  return globalKey;
+}
+
 Future<String?> getFriendsLastLocation({
   required List<String> publicKeys,
 }) async {
