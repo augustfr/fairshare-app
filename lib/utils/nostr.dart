@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:google_maps_example/pages/qr_scanner.dart';
 import 'package:nostr/nostr.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void startListeningToEvents({required List<String> publicKeys}) async {
   // Create a subscription message request with filters
@@ -93,6 +94,66 @@ Future<List<String>> getPreviousEvents(
   return eventsCompleter.future;
 }
 
+Future<String?> getFriendsLastLocation({
+  required List<String> publicKeys,
+}) async {
+  Completer<String?> eventCompleter = Completer();
+  final prefs = await SharedPreferences.getInstance();
+  String globalKey = prefs.getString('global_key') ?? '';
+  //globalKey = '123';
+  // Create a subscription message request with filters
+  Request requestWithFilter = Request(generate64RandomHexChars(), [
+    Filter(
+      authors: publicKeys, // Listen to an array of public keys
+      kinds: [1],
+      since: 0,
+      limit: 450,
+    )
+  ]);
+
+  // Connecting to a nostr relay using websocket
+  WebSocket webSocket = await WebSocket.connect('wss://relay.damus.io');
+
+  String? mostRecentEventWithLocation;
+
+  webSocket.add(requestWithFilter.serialize());
+
+  webSocket.listen((event) {
+    // Check if the event contains the string "currentLocation"
+    if (event.contains('currentLocation')) {
+      String jsonString = getContent(event);
+      Map<String, dynamic> jsonContent = jsonDecode(jsonString);
+
+      // Check if the global_key in the event matches globalKey
+      if (jsonContent['global_key'] != globalKey) {
+        // Get the content and createdAt from the event
+        int createdAt = getCreatedAt(event);
+
+        // Check if this is the most recent "currentLocation" event
+        if (mostRecentEventWithLocation == null ||
+            createdAt > getCreatedAt(mostRecentEventWithLocation!)) {
+          mostRecentEventWithLocation = event;
+        }
+      }
+    }
+
+    // Check if the event contains the string "EOSE"
+    if (event.contains('EOSE')) {
+      // Close the WebSocket and complete the eventCompleter with the content of the most recent "currentLocation" event
+      webSocket.close().then((_) {
+        if (mostRecentEventWithLocation != null) {
+          String jsonString = getContent(mostRecentEventWithLocation!);
+          eventCompleter.complete(jsonString);
+        } else {
+          eventCompleter.complete(null);
+        }
+      });
+    }
+  });
+
+  return eventCompleter.future;
+}
+
 Future<String> listenForConfirm({required String publicKey}) async {
   // Create a completer for returning the event
   Completer<String> completer = Completer<String>();
@@ -172,6 +233,17 @@ String getContent(String input) {
 
   // Get the content field from the third element of the list
   String content = list[2]['content'];
+
+  // Return the content
+  return content;
+}
+
+int getCreatedAt(String input) {
+  // Parse the input string into a list
+  List<dynamic> list = jsonDecode(input);
+
+  // Get the content field from the third element of the list
+  int content = list[2]['created_at'];
 
   // Return the content
   return content;

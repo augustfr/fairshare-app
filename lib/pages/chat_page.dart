@@ -110,14 +110,7 @@ class _ChatPageState extends State<ChatPage> {
         'timestamp': timestamp,
       });
 
-      // String testContent = jsonEncode({
-      //   'global_key': '123123',
-      //   'message': 'reponse',
-      //   'timestamp': timestamp + 5,
-      // });
-
       postToNostr(widget.sharedKey, content);
-      //postToNostr(widget.sharedKey, testContent);
     }
   }
 

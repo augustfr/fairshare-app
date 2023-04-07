@@ -24,23 +24,38 @@ class _HomePageState extends State<HomePage> {
   GoogleMapController? _controller;
   final Set<Marker> _markers = {}; // Add this line to store markers
 
-  List<double> myCurrentLocation = [0.0, 0.0]; // Default value
+  LatLng myCurrentLocation = const LatLng(0.0, 0.0); // Default value
 
   late Future<CameraPosition> _initialCameraPosition;
 
   StreamSubscription<LocationData>? _locationSubscription;
 
-  void _subscribeToLocationUpdates() {
+  void _subscribeToLocationUpdates() async {
     final location = Location();
 
     _locationSubscription =
-        location.onLocationChanged.listen((LocationData currentLocation) {
+        location.onLocationChanged.listen((LocationData currentLocation) async {
+      _fetchFriendsLocations();
       setState(() {
-        myCurrentLocation = [
+        myCurrentLocation = LatLng(
           currentLocation.latitude ?? 0.0,
           currentLocation.longitude ?? 0.0,
-        ];
+        );
       });
+
+      final friendsList = await loadFriends();
+
+      final prefs = await SharedPreferences.getInstance();
+      String globalKey = prefs.getString('global_key') ?? '';
+
+      for (final friend in friendsList) {
+        Map<String, dynamic> decodedFriend =
+            jsonDecode(friend) as Map<String, dynamic>;
+        String sharedKey = decodedFriend['privateKey'];
+        final content = jsonEncode(
+            {'currentLocation': myCurrentLocation, 'global_key': globalKey});
+        postToNostr(sharedKey, content);
+      }
     });
   }
 
@@ -50,7 +65,7 @@ class _HomePageState extends State<HomePage> {
     _initialCameraPosition = _getCurrentLocation();
     _checkFirstTimeUser();
     _subscribeToLocationUpdates();
-    _fetchFriendsLocations(); // Add this line to fetch friends locations
+    _fetchFriendsLocations();
   }
 
   // Method to get current location
@@ -97,42 +112,89 @@ class _HomePageState extends State<HomePage> {
     return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
   }
 
-  Future<void> _fetchFriendsLocations() async {
-    try {
-      List<String> friendsList = await loadFriends();
-      // Create a custom marker icon with a specified color and radius
-      BitmapDescriptor customMarkerIcon =
-          await _createCircleMarkerIcon(Colors.red, 20);
+  void _fetchFriendsLocations() async {
+    BitmapDescriptor customMarkerIcon =
+        await _createCircleMarkerIcon(Colors.red, 20);
 
-      // Create a set of markers for existing friends
-      Set<Marker> updatedMarkers = {};
-      for (var friendJson in friendsList) {
-        Map<String, dynamic> friendData = jsonDecode(friendJson);
-        String locationString = friendData['currentLocation'];
-        List<String> latLngStrings =
-            locationString.substring(7, locationString.length - 1).split(', ');
-        double latitude = double.parse(latLngStrings[0]);
-        double longitude = double.parse(latLngStrings[1]);
-        LatLng friendLatLng = LatLng(latitude, longitude);
-        String? friendName = friendData['name'];
-        updatedMarkers.add(
-          Marker(
-            markerId: MarkerId(friendName ?? 'Anonymous'),
-            position: friendLatLng,
-            infoWindow: InfoWindow(title: friendName),
-            icon: customMarkerIcon, // Use the custom marker icon
-          ),
-        );
+    Set<Marker> updatedMarkers = {};
+
+    List<String> friendsList = await loadFriends();
+    for (var friendJson in friendsList) {
+      Map<String, dynamic> friendData = jsonDecode(friendJson);
+      String? friendName = friendData['name'];
+      String pubicKey = getPublicKey(friendData['privateKey']);
+      final friendLocation =
+          await getFriendsLastLocation(publicKeys: [pubicKey]);
+
+      if (friendLocation != null) {
+        Map<String, dynamic> parsedJson = jsonDecode(friendLocation);
+
+        // Check if the global_key in the event matches globalKey
+        final prefs = await SharedPreferences.getInstance();
+        String globalKey = prefs.getString('global_key') ?? '';
+        if (parsedJson['global_key'] != globalKey) {
+          // Use the shared_preferences friendData['currentLocation'] in this scenario
+          List<double> currentLocation =
+              parseLatLngFromString(friendData['currentLocation']);
+
+          double? latitude = currentLocation[0];
+          double? longitude = currentLocation[1];
+
+          updatedMarkers.add(
+            Marker(
+              markerId: MarkerId(friendName ?? 'Anonymous'),
+              position: LatLng(latitude, longitude),
+              infoWindow: InfoWindow(title: friendName ?? 'Anonymous'),
+              icon: customMarkerIcon,
+            ),
+          );
+        } else {
+          List<double> currentLocation =
+              parsedJson['currentLocation'].cast<double>();
+
+          double? latitude = currentLocation[0];
+          double? longitude = currentLocation[1];
+
+          updatedMarkers.add(
+            Marker(
+              markerId: MarkerId(friendName ?? 'Anonymous'),
+              position: LatLng(latitude, longitude),
+              infoWindow: InfoWindow(title: friendName ?? 'Anonymous'),
+              icon: customMarkerIcon,
+            ),
+          );
+
+          // Update the friend's current location
+          friendData['currentLocation'] = 'LatLng($latitude, $longitude)';
+
+          // Find the index of the friendJson in the friendsList
+          int friendIndex = friendsList.indexOf(friendJson);
+
+          // Update the friendJson in the friendsList
+          friendsList[friendIndex] = jsonEncode(friendData);
+        }
       }
-
-      // Update the _markers set with the updated markers
-      setState(() {
-        _markers.clear();
-        _markers.addAll(updatedMarkers);
-      });
-    } catch (e) {
-      print('Error fetching friends locations: $e');
     }
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('friends', friendsList);
+
+    // Update the _markers set with the updated markers
+    setState(() {
+      _markers.clear();
+      _markers.addAll(updatedMarkers);
+    });
+  }
+
+  List<double> parseLatLngFromString(String latLngString) {
+    RegExp regex = RegExp(r'LatLng\(([^,]+),\s*([^)]+)\)');
+    Match? match = regex.firstMatch(latLngString);
+    if (match != null) {
+      double latitude = double.parse(match.group(1) ?? '0');
+      double longitude = double.parse(match.group(2) ?? '0');
+      return [latitude, longitude];
+    }
+    return [0, 0];
   }
 
   @override
