@@ -67,13 +67,10 @@ Future<List<String>> getPreviousEvents(
   webSocket.listen((event) {
     //print('Received event: $event');
     if (event.contains('global_key')) {
-      // Extract the JSON string from the event
-      int start = event.indexOf('global_key') - 3;
-      int end = event.indexOf('}') + 1;
-      String jsonString = event.substring(start, end);
-      jsonString = jsonString.replaceAll('\\', '');
-      // Add the JSON string to the eventsList
-      eventsList.add(jsonString);
+      String content = getContent(event);
+      if (content.contains('timestamp')) {
+        eventsList.add(content);
+      }
     }
 
     // Check if the event contains the string "EOSE"
