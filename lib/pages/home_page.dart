@@ -32,20 +32,26 @@ class _HomePageState extends State<HomePage> {
 
   void _subscribeToLocationUpdates() async {
     final location = Location();
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    double latitude = prefs.getDouble('current_latitude') ?? 0.0;
+    double longitude = prefs.getDouble('current_longitude') ?? 0.0;
 
     _locationSubscription =
         location.onLocationChanged.listen((LocationData currentLocation) async {
       _fetchFriendsLocations();
+
+      // Update latitude and longitude in SharedPreferences
+      latitude = currentLocation.latitude ?? 0.0;
+      longitude = currentLocation.longitude ?? 0.0;
+      await prefs.setDouble('current_latitude', latitude);
+      await prefs.setDouble('current_longitude', longitude);
+
       setState(() {
-        myCurrentLocation = LatLng(
-          currentLocation.latitude ?? 0.0,
-          currentLocation.longitude ?? 0.0,
-        );
+        myCurrentLocation = LatLng(latitude, longitude);
       });
 
       final friendsList = await loadFriends();
 
-      final prefs = await SharedPreferences.getInstance();
       String globalKey = prefs.getString('global_key') ?? '';
 
       for (final friend in friendsList) {
