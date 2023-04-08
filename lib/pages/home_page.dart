@@ -54,6 +54,7 @@ class _HomePageState extends State<HomePage> {
       });
 
       final friendsList = await loadFriends();
+      //print(friendsList);
 
       String globalKey = prefs.getString('global_key') ?? '';
 
@@ -136,9 +137,9 @@ class _HomePageState extends State<HomePage> {
     for (var friendJson in friendsList) {
       Map<String, dynamic> friendData = jsonDecode(friendJson);
       String? friendName = friendData['name'];
-      String pubicKey = getPublicKey(friendData['privateKey']);
+      String publicKey = getPublicKey(friendData['privateKey']);
       final friendLocation =
-          await getFriendsLastLocation(publicKeys: [pubicKey]);
+          await getFriendsLastLocation(publicKeys: [publicKey]);
       double? latitude;
       double? longitude;
       if (friendLocation != null) {
@@ -148,29 +149,30 @@ class _HomePageState extends State<HomePage> {
         String globalKey = prefs.getString('global_key') ?? '';
 
         if (parsedJson['global_key'] != globalKey) {
-          friendData['currentLocation'] ??= '';
-        } else {
-          friendData['currentLocation'] =
-              parsedJson['currentLocation'].cast<double>().toString();
+          List<double> currentLocation =
+              parsedJson['currentLocation'].cast<double>();
+          latitude = currentLocation[0];
+          longitude = currentLocation[1];
+          friendData['currentLocation'] = 'LatLng($latitude, $longitude)';
         }
       }
 
-      List<double> currentLocation =
-          parseLatLngFromString(friendData['currentLocation']);
-      latitude = currentLocation[0];
-      longitude = currentLocation[1];
+      if (friendData['currentLocation'] != null) {
+        List<double> currentLocation =
+            parseLatLngFromString(friendData['currentLocation']);
+        latitude = currentLocation[0];
+        longitude = currentLocation[1];
+        updatedMarkers.add(
+          Marker(
+            markerId: MarkerId(friendName ?? 'Anonymous'),
+            position: LatLng(latitude, longitude),
+            infoWindow: InfoWindow(title: friendName ?? 'Anonymous'),
+            icon: customMarkerIcon,
+          ),
+        );
 
-      updatedMarkers.add(
-        Marker(
-          markerId: MarkerId(friendName ?? 'Anonymous'),
-          position: LatLng(latitude, longitude),
-          infoWindow: InfoWindow(title: friendName ?? 'Anonymous'),
-          icon: customMarkerIcon,
-        ),
-      );
-
-      friendData['currentLocation'] = 'LatLng($latitude, $longitude)';
-      friendsList[friendsList.indexOf(friendJson)] = jsonEncode(friendData);
+        friendsList[friendsList.indexOf(friendJson)] = jsonEncode(friendData);
+      }
     }
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
