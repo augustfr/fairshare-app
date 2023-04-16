@@ -87,8 +87,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
       "currentLocation": friendLocation
     };
     String jsonString = json.encode(jsonMap);
-    bool test = await addFriend(jsonString, photoPath);
-    if (test) {
+    bool added = await addFriend(jsonString, photoPath);
+    if (added) {
       widget.onQRScanSuccess();
     }
     return null;
