@@ -144,10 +144,12 @@ Future<String?> getFriendsLastLocation({
     // Check if the event contains the string "currentLocation"
     if (event.contains('currentLocation')) {
       String jsonString = getContent(event);
+      //print(jsonString);
       Map<String, dynamic> jsonContent = jsonDecode(jsonString);
 
       // Check if the global_key in the event matches globalKey
-      if (jsonContent['global_key'] != globalKey) {
+      if (jsonContent['global_key'] != globalKey &&
+          jsonContent['global_key'] != null) {
         // Get the content and createdAt from the event
         int createdAt = getCreatedAt(event);
 
