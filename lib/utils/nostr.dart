@@ -4,6 +4,11 @@ import 'dart:convert';
 import 'package:google_maps_example/pages/qr_scanner.dart';
 import 'package:nostr/nostr.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:synchronized/synchronized.dart';
+
+final _lock = Lock();
+
+String relay = 'wss://relay.snort.social';
 
 void startListeningToEvents({required List<String> publicKeys}) async {
   // Create a subscription message request with filters
@@ -18,7 +23,7 @@ void startListeningToEvents({required List<String> publicKeys}) async {
 
   // Connecting to a nostr relay using websocket
   WebSocket webSocket = await WebSocket.connect(
-    'wss://relay.damus.io', // or any nostr relay
+    relay, // or any nostr relay
   );
 
   // Send a request message to the WebSocket server
@@ -43,7 +48,12 @@ Future<List<String>> getPreviousEvents(
     required bool markAsRead}) async {
   Completer<List<String>> eventsCompleter = Completer();
   SharedPreferences prefs = await SharedPreferences.getInstance();
-  List<String> friendsList = prefs.getStringList('friends') ?? [];
+  List<String> friendsList = [];
+
+  await _lock.synchronized(() async {
+    friendsList = prefs.getStringList('friends') ?? [];
+  });
+
   List<String> eventsList = [];
 
   // Create a subscription message request with filters
@@ -58,7 +68,7 @@ Future<List<String>> getPreviousEvents(
 
   // Connecting to a nostr relay using websocket
   WebSocket webSocket = await WebSocket.connect(
-    'wss://relay.damus.io', // or any nostr relay
+    relay, // or any nostr relay
   );
 
   // Send a request message to the WebSocket server
@@ -81,7 +91,9 @@ Future<List<String>> getPreviousEvents(
             markAsRead) {
           friendData['latestMessage'] = currentTimestamp;
           friendsList[friendIndex] = json.encode(friendData);
-          prefs.setStringList('friends', friendsList);
+          _lock.synchronized(() async {
+            prefs.setStringList('friends', friendsList);
+          });
         }
       }
     }
@@ -134,7 +146,7 @@ Future<String?> getFriendsLastLocation({
   ]);
 
   // Connecting to a nostr relay using websocket
-  WebSocket webSocket = await WebSocket.connect('wss://relay.damus.io');
+  WebSocket webSocket = await WebSocket.connect(relay);
 
   String? mostRecentEventWithLocation;
 
@@ -179,6 +191,7 @@ Future<String?> getFriendsLastLocation({
 }
 
 Future<String> listenForConfirm({required String publicKey}) async {
+  print(publicKey);
   // Create a completer for returning the event
   Completer<String> completer = Completer<String>();
 
@@ -194,7 +207,7 @@ Future<String> listenForConfirm({required String publicKey}) async {
 
   // Connecting to a nostr relay using websocket
   WebSocket webSocket = await WebSocket.connect(
-    'wss://relay.damus.io', // or any nostr relay
+    relay, // or any nostr relay
   );
 
   // Send a request message to the WebSocket server
@@ -206,6 +219,8 @@ Future<String> listenForConfirm({required String publicKey}) async {
 
   // Listen for events from the WebSocket server
   webSocket.listen((event) {
+    print('listening for confirm');
+    print(event);
     //print('Received event: $event');
     // Complete the completer with the received event
     if (!event.contains("EOSE")) {
@@ -230,15 +245,17 @@ String getPublicKey(privateKey) {
 }
 
 Future<void> postToNostr(String privateKey, String content) async {
-  print('Posting to Nostr: ' + content);
+  print('Posting to Nostr: ' +
+      content +
+      'at this pub key: ' +
+      getPublicKey(privateKey));
   // Instantiate an event with a partial data and let the library sign the event with your private key
   Event eventToSend =
       Event.from(kind: 1, tags: [], content: content, privkey: privateKey);
   // Connecting to a nostr relay using websocket
   WebSocket webSocket = await WebSocket.connect(
-    'wss://relay.damus.io', // or any nostr relay
+    'wss://relay.snort.social', // or any nostr relay
   );
-
   // Send an event to the WebSocket server
   webSocket.add(eventToSend.serialize());
 

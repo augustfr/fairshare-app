@@ -6,12 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:synchronized/synchronized.dart';
 import '../models/map_style.dart';
 import './friends_list_page.dart';
 import './qr_scanner.dart';
 import '../utils/nostr.dart';
 import '../utils/friends.dart';
 import '../utils/location.dart';
+
+final _lock = Lock();
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -27,6 +30,8 @@ class _HomePageState extends State<HomePage> {
   LatLng myCurrentLocation = const LatLng(0.0, 0.0); // Default value
   List<int> unreadFriendIndexes = [];
 
+  List<String> friendsList = [];
+
   late Future<CameraPosition> _initialCameraPosition;
 
   StreamSubscription<LocationData>? _locationSubscription;
@@ -34,44 +39,53 @@ class _HomePageState extends State<HomePage> {
   void _subscribeToLocationUpdates() async {
     final location = Location();
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    double latitude = prefs.getDouble('current_latitude') ?? 0.0;
-    double longitude = prefs.getDouble('current_longitude') ?? 0.0;
-    LatLng oldLocation = LatLng(latitude, longitude);
+    double latitude;
+    double longitude;
+    List<int> _unreadFriendIndexes;
+    LatLng oldLocation = const LatLng(0, 0);
+
+    await _lock.synchronized(() async {
+      latitude = prefs.getDouble('current_latitude') ?? 0.0;
+      longitude = prefs.getDouble('current_longitude') ?? 0.0;
+      oldLocation = LatLng(latitude, longitude);
+    });
 
     _locationSubscription =
         location.onLocationChanged.listen((LocationData currentLocation) async {
-      _fetchFriendsLocations();
+      List<String> friendsList = await loadFriends();
+      _fetchFriendsLocations(friendsList);
 
       // Update latitude and longitude in SharedPreferences
       latitude = currentLocation.latitude ?? 0.0;
       longitude = currentLocation.longitude ?? 0.0;
-      await prefs.setDouble('current_latitude', latitude);
-      await prefs.setDouble('current_longitude', longitude);
-      List<int> _unreadFriendIndexes = await checkForUnreadMessages();
+      _unreadFriendIndexes = await checkForUnreadMessages(friendsList);
       setState(() {
         myCurrentLocation = LatLng(latitude, longitude);
         unreadFriendIndexes = _unreadFriendIndexes;
       });
 
-      final friendsList = await loadFriends();
-      //print(friendsList);
+      await _lock.synchronized(() async {
+        await prefs.setDouble('current_latitude', latitude);
+        await prefs.setDouble('current_longitude', longitude);
+        String globalKey = prefs.getString('global_key') ?? '';
 
-      String globalKey = prefs.getString('global_key') ?? '';
-
-      // Check if the distance between the old and new locations is greater than or equal to 0.1 miles
-      double distance = getDistance(oldLocation, myCurrentLocation);
-      if (distance >= 0.1) {
-        for (final friend in friendsList) {
-          Map<String, dynamic> decodedFriend =
-              jsonDecode(friend) as Map<String, dynamic>;
-          String sharedKey = decodedFriend['privateKey'];
-          final content = jsonEncode(
-              {'currentLocation': myCurrentLocation, 'global_key': globalKey});
-          postToNostr(sharedKey, content);
+        // Check if the distance between the old and new locations is greater than or equal to 0.1 miles
+        double distance = getDistance(oldLocation, myCurrentLocation);
+        if (distance >= 0.1) {
+          for (final friend in friendsList) {
+            Map<String, dynamic> decodedFriend =
+                jsonDecode(friend) as Map<String, dynamic>;
+            String sharedKey = decodedFriend['privateKey'];
+            final content = jsonEncode({
+              'currentLocation': myCurrentLocation,
+              'global_key': globalKey
+            });
+            postToNostr(sharedKey, content);
+          }
+          // Update oldLocation to myCurrentLocation after posting to Nostr
+          oldLocation = myCurrentLocation;
         }
-        // Update oldLocation to myCurrentLocation after posting to Nostr
-        oldLocation = myCurrentLocation;
-      }
+      });
     });
   }
 
@@ -128,11 +142,10 @@ class _HomePageState extends State<HomePage> {
     return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
   }
 
-  void _fetchFriendsLocations() async {
+  Future<List<String>> _fetchFriendsLocations(friendsList) async {
     BitmapDescriptor customMarkerIcon =
         await _createCircleMarkerIcon(Colors.red, 20);
     Set<Marker> updatedMarkers = {};
-    List<String> friendsList = await loadFriends();
 
     for (var friendJson in friendsList) {
       Map<String, dynamic> friendData = jsonDecode(friendJson);
@@ -175,14 +188,13 @@ class _HomePageState extends State<HomePage> {
       }
     }
 
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('friends', friendsList);
-
     // Update the _markers set with the updated markers
     setState(() {
       _markers.clear();
       _markers.addAll(updatedMarkers);
     });
+
+    return friendsList;
   }
 
   List<double> parseLatLngFromString(String latLngString) {
@@ -237,7 +249,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         );
                         if (friendsListUpdated == true) {
-                          _fetchFriendsLocations();
+                          _fetchFriendsLocations(friendsList);
                         }
                       },
                       shape: const CircleBorder(),
@@ -285,7 +297,7 @@ class _HomePageState extends State<HomePage> {
                         MaterialPageRoute(
                           builder: (context) => QRScannerPage(
                             onQRScanSuccess: () {
-                              _fetchFriendsLocations();
+                              _fetchFriendsLocations(friendsList);
                             },
                           ),
                         ),

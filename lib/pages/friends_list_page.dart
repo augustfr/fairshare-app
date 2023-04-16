@@ -6,11 +6,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:synchronized/synchronized.dart';
 
 import './chat_page.dart';
 import './profile_page.dart';
 import '../utils/friends.dart';
 import '../utils/location.dart';
+
+final _lock = Lock();
 
 class FriendsListPage extends StatefulWidget {
   const FriendsListPage({Key? key}) : super(key: key);
@@ -30,10 +33,11 @@ class _FriendsListPageState extends State<FriendsListPage> {
   }
 
   Future<void> _loadFriends() async {
+    print('loadfriends in friendslist page');
     List<String> friendsList = await loadFriends();
     LatLng savedLocation = await getSavedLocation();
 
-    unreadMessageIndexes = (await checkForUnreadMessages()).toSet();
+    unreadMessageIndexes = (await checkForUnreadMessages(friendsList)).toSet();
 
     setState(() {
       _friends = friendsList.map((friend) {
@@ -55,15 +59,17 @@ class _FriendsListPageState extends State<FriendsListPage> {
   }
 
   Future<void> _removeFriend(int index) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String> friendsList = prefs.getStringList('friends') ?? [];
-
-    friendsList.removeAt(index);
-    await prefs.setStringList('friends', friendsList);
+    await _lock.synchronized(() async {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      List<String> friendsList = prefs.getStringList('friends') ?? [];
+      friendsList.removeAt(index);
+      await prefs.setStringList('friends', friendsList);
+    });
 
     setState(() {
       _friends.removeAt(index);
     });
+
     Navigator.pop(context, true);
   }
 
@@ -156,10 +162,14 @@ class _FriendsListPageState extends State<FriendsListPage> {
       await File(pickedFile.path).copy(newPath);
       _friends[index]['photoPath'] = newPath;
 
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      List<String> friendsList =
-          _friends.map((friend) => jsonEncode(friend)).toList().cast<String>();
-      await prefs.setStringList('friends', friendsList);
+      await _lock.synchronized(() async {
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        List<String> friendsList = _friends
+            .map((friend) => jsonEncode(friend))
+            .toList()
+            .cast<String>();
+        await prefs.setStringList('friends', friendsList);
+      });
 
       setState(() {});
     }
@@ -168,10 +178,12 @@ class _FriendsListPageState extends State<FriendsListPage> {
   Future<void> _selectNewName(int index, String name) async {
     _friends[index]['name'] = name;
 
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String> friendsList =
-        _friends.map((friend) => jsonEncode(friend)).toList().cast<String>();
-    await prefs.setStringList('friends', friendsList);
+    await _lock.synchronized(() async {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      List<String> friendsList =
+          _friends.map((friend) => jsonEncode(friend)).toList().cast<String>();
+      await prefs.setStringList('friends', friendsList);
+    });
 
     setState(() {});
   }

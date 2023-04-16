@@ -74,9 +74,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
       _privateKey = privateKey;
       _currentLocationString = currentLocationString;
     });
+    print('listening');
+    print(getPublicKey(privateKey));
+
     String event = await listenForConfirm(publicKey: pubKey);
     Map<String, dynamic> content = json.decode(getContent(event));
-
     String friendName = content['name'];
     String friendLocation = content['currentLocation'];
     String? photoPath =
@@ -215,13 +217,13 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     onPressed: _toggleScan,
                     child: Text(_isScanning ? 'Stop Scanning' : 'Scan'),
                   ),
-                  // ElevatedButton(
-                  //   onPressed: () async {
-                  //     await postToNostr(_privateKey,
-                  //         '{"name": "Gene", "currentLocation": "LatLng(37.792520, -122.440140)"}');
-                  //   },
-                  //   child: const Text('Debug scanned'),
-                  // ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      await postToNostr(_privateKey,
+                          '{"name": "Gene", "currentLocation": "LatLng(37.792520, -122.440140)", "globalKey": "123"}');
+                    },
+                    child: const Text('Debug scanned'),
+                  ),
                   Visibility(
                     visible: _isScanning,
                     child: SizedBox(
@@ -252,11 +254,15 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                 SharedPreferences prefs =
                                     await SharedPreferences.getInstance();
                                 String? name = prefs.getString('user_name');
+                                String? globalKey =
+                                    prefs.getString('global_key');
                                 if (!isAlreadyAdded) {
                                   String jsonBody = '{"name": "' +
                                       (name ?? 'Anonymous') +
                                       '", "currentLocation": "' +
                                       _currentLocationString +
+                                      '", "globalKey": "' +
+                                      (globalKey ?? 'KEY NOT FOUND') +
                                       '"}';
                                   postToNostr(
                                       friendData['privateKey'], jsonBody);

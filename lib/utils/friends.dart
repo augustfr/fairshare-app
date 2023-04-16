@@ -3,10 +3,16 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter_vibrate/flutter_vibrate.dart';
 import '../utils/nostr.dart';
+import 'package:synchronized/synchronized.dart';
+
+final _lock = Lock();
 
 Future<List<String>> loadFriends() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
-  List<String> friendsList = prefs.getStringList('friends') ?? [];
+  List<String> friendsList = [];
+
+  friendsList = prefs.getStringList('friends') ?? [];
+
   return friendsList;
 }
 
@@ -14,7 +20,12 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
   final Map<String, dynamic> friendData = jsonDecode(rawData);
   SharedPreferences prefs = await SharedPreferences.getInstance();
 
-  List<String> friendsList = prefs.getStringList('friends') ?? [];
+  List<String> friendsList = [];
+
+  await _lock.synchronized(() async {
+    friendsList = prefs.getStringList('friends') ?? [];
+  });
+
   // Check if the friend is already in the list
   for (String friend in friendsList) {
     final Map<String, dynamic> existingFriend = jsonDecode(friend);
@@ -29,8 +40,15 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
   }
 
   friendsList.add(jsonEncode(friendData));
+  print('new friends list:');
+  print(friendsList);
+  await _lock.synchronized(() async {
+    await prefs.setStringList('friends', friendsList);
+  });
 
-  await prefs.setStringList('friends', friendsList);
+  // Update friendsList variable stored in SharedPreferences
+  await loadFriends();
+
   Vibrate.feedback(FeedbackType.success);
   return true; // Friend added successfully
 }
@@ -40,10 +58,9 @@ Future<void> removeAllFriends() async {
   await prefs.remove('friends');
 }
 
-Future<List<int>> checkForUnreadMessages() async {
+Future<List<int>> checkForUnreadMessages(friendsList) async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
-  List<String> friendsList = await loadFriends();
-  //print(friendsList);
+
   List<int> friendsWithUnreadMessages = [];
   String myGlobalKey = prefs.getString('global_key') ?? '';
   for (int i = 0; i < friendsList.length; i++) {
@@ -68,11 +85,12 @@ Future<List<int>> checkForUnreadMessages() async {
         decodedFriend['hasUnreadMessages'] = false;
       }
       friendsList[i] = json.encode(decodedFriend);
+      // Update SharedPreferences
+      await _lock.synchronized(() async {
+        prefs.setStringList('friends', friendsList);
+      });
     }
   }
-
-  // Update SharedPreferences
-  prefs.setStringList('friends', friendsList);
 
   return friendsWithUnreadMessages;
 }
