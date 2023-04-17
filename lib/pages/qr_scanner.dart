@@ -12,7 +12,9 @@ import '../utils/friends.dart';
 import '../utils/location.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-const loopTime = 10; //in seconds
+Duration loopTime = const Duration(seconds: 10);
+
+bool scannerPageOpen = false;
 
 class QRScannerPage extends StatefulWidget {
   final Function onQRScanSuccess;
@@ -41,9 +43,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   @override
   void initState() {
+    print('qr code scanner page opened');
     super.initState();
+    scannerPageOpen = true;
     cameraController = MobileScannerController();
-    _timer = Timer.periodic(const Duration(seconds: loopTime), (timer) async {
+    _timer = Timer.periodic(loopTime, (timer) async {
       _updateKey();
     });
     _loadUserData();
@@ -51,7 +55,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   @override
   void dispose() {
+    print('qr code page closed');
     _timer.cancel();
+    scannerPageOpen = false;
     cameraController.dispose();
     super.dispose();
   }
@@ -74,9 +80,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
       _privateKey = privateKey;
       _currentLocationString = currentLocationString;
     });
-    print('listening');
-    print(getPublicKey(privateKey));
-
     String event = await listenForConfirm(publicKey: pubKey);
     Map<String, dynamic> content = json.decode(getContent(event));
     String friendName = content['name'];

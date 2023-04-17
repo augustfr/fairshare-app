@@ -23,8 +23,11 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   GoogleMapController? _controller;
+  Timer? _timer;
+  bool _isFetchingData = false;
+
   final Set<Marker> _markers = {}; // Add this line to store markers
 
   LatLng myCurrentLocation = const LatLng(0.0, 0.0); // Default value
@@ -41,7 +44,6 @@ class _HomePageState extends State<HomePage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     double latitude;
     double longitude;
-    List<int> _unreadFriendIndexes;
     LatLng oldLocation = const LatLng(0, 0);
 
     await _lock.synchronized(() async {
@@ -52,16 +54,12 @@ class _HomePageState extends State<HomePage> {
 
     _locationSubscription =
         location.onLocationChanged.listen((LocationData currentLocation) async {
-      List<String> friendsList = await loadFriends();
-      _fetchFriendsLocations(friendsList);
-
       // Update latitude and longitude in SharedPreferences
       latitude = currentLocation.latitude ?? 0.0;
       longitude = currentLocation.longitude ?? 0.0;
-      _unreadFriendIndexes = await checkForUnreadMessages(friendsList);
+
       setState(() {
         myCurrentLocation = LatLng(latitude, longitude);
-        unreadFriendIndexes = _unreadFriendIndexes;
       });
 
       await _lock.synchronized(() async {
@@ -72,6 +70,7 @@ class _HomePageState extends State<HomePage> {
         // Check if the distance between the old and new locations is greater than or equal to 0.1 miles
         double distance = getDistance(oldLocation, myCurrentLocation);
         if (distance >= 0.1) {
+          List<String> friendsList = await loadFriends();
           for (final friend in friendsList) {
             Map<String, dynamic> decodedFriend =
                 jsonDecode(friend) as Map<String, dynamic>;
@@ -89,13 +88,59 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Future<void> _fetchAndUpdateData() async {
+    if (!scannerPageOpen) {
+      _isFetchingData = true;
+      List<String> friendsList = await loadFriends();
+      await _fetchFriendsLocations(friendsList);
+      List<int> _unreadFriendIndexes =
+          await checkForUnreadMessages(friendsList);
+
+      setState(() {
+        unreadFriendIndexes = _unreadFriendIndexes;
+      });
+      _isFetchingData = false;
+    }
+  }
+
+  void _startDataFetchingTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      if (!_isFetchingData) {
+        await _fetchAndUpdateData();
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    connectWebSocket();
+    WidgetsBinding.instance.addObserver(this);
     _initialCameraPosition = _getCurrentLocation();
+    _fetchAndUpdateData();
+    _startDataFetchingTimer();
     _checkFirstTimeUser();
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _subscribeToLocationUpdates());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _locationSubscription?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Resume the timer when the HomePage is resumed
+      _startDataFetchingTimer();
+    } else if (state == AppLifecycleState.paused) {
+      // Cancel the timer when the HomePage is paused
+      _timer?.cancel();
+    }
   }
 
   // Method to get current location
@@ -206,12 +251,6 @@ class _HomePageState extends State<HomePage> {
       return [latitude, longitude];
     }
     return [0, 0];
-  }
-
-  @override
-  void dispose() {
-    _locationSubscription?.cancel();
-    super.dispose();
   }
 
   @override

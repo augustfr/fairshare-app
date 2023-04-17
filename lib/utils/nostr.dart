@@ -10,7 +10,28 @@ final _lock = Lock();
 
 String relay = 'wss://relay.snort.social';
 
+WebSocket? webSocket;
+StreamSubscription<dynamic>? streamSubscription;
+Timer? timer;
+
+Future<void> connectWebSocket() async {
+  if (webSocket == null || webSocket!.readyState == WebSocket.closed) {
+    webSocket = await WebSocket.connect(relay);
+    streamSubscription = webSocket!.listen((event) {
+      print('event received in connectWebSocket function:');
+      print(event);
+    });
+  }
+}
+
+Future<void> closeWebSocket() async {
+  await webSocket!.close();
+  webSocket = null;
+}
+
 void startListeningToEvents({required List<String> publicKeys}) async {
+  print('listening with startListeningToEvents function');
+
   // Create a subscription message request with filters
   Request requestWithFilter = Request(generate64RandomHexChars(), [
     Filter(
@@ -21,23 +42,16 @@ void startListeningToEvents({required List<String> publicKeys}) async {
     )
   ]);
 
-  // Connecting to a nostr relay using websocket
-  WebSocket webSocket = await WebSocket.connect(
-    relay, // or any nostr relay
-  );
-
   // Send a request message to the WebSocket server
-  webSocket.add(requestWithFilter.serialize());
+  webSocket!.add(requestWithFilter.serialize());
 
-  Timer timer = Timer(const Duration(seconds: loopTime), () async {
-    await webSocket.close();
-  });
+  // Timer timer = Timer(loopTime, () async {
+  //   await webSocket!.close();
+  // });
 
   // Listen for events from the WebSocket server
-  webSocket.listen((event) {
+  streamSubscription = webSocket!.listen((event) {
     print('Received event: $event');
-  }, onDone: () {
-    timer.cancel(); // Cancel the timer when the connection is closed
   });
 }
 
@@ -46,6 +60,7 @@ Future<List<String>> getPreviousEvents(
     {required List<String> publicKeys,
     required int friendIndex,
     required bool markAsRead}) async {
+  print('listening with getPreviousEvents function');
   Completer<List<String>> eventsCompleter = Completer();
   SharedPreferences prefs = await SharedPreferences.getInstance();
   List<String> friendsList = [];
@@ -66,20 +81,15 @@ Future<List<String>> getPreviousEvents(
     )
   ]);
 
-  // Connecting to a nostr relay using websocket
-  WebSocket webSocket = await WebSocket.connect(
-    relay, // or any nostr relay
-  );
-
   // Send a request message to the WebSocket server
-  webSocket.add(requestWithFilter.serialize());
+  webSocket!.add(requestWithFilter.serialize());
 
-  Timer timer = Timer(const Duration(seconds: loopTime), () async {
-    await webSocket.close();
-  });
+  // Timer timer = Timer(loopTime, () async {
+  //   await webSocket.close();
+  // });
 
   // Listen for events from the WebSocket server
-  webSocket.listen((event) {
+  webSocket!.listen((event) {
     if (event.contains('global_key')) {
       String content = getContent(event);
       if (content.contains('timestamp')) {
@@ -100,14 +110,6 @@ Future<List<String>> getPreviousEvents(
 
     // Check if the event contains the string "EOSE"
     if (event.contains('EOSE')) {
-      webSocket.close().then((_) {
-        timer.cancel();
-        eventsCompleter.complete(eventsList);
-      });
-    }
-  }, onDone: () {
-    if (!eventsCompleter.isCompleted) {
-      timer.cancel();
       eventsCompleter.complete(eventsList);
     }
   });
@@ -131,6 +133,7 @@ String getGlobalKey(String content) {
 Future<String?> getFriendsLastLocation({
   required List<String> publicKeys,
 }) async {
+  print('listening with getFriendsLastLocation function');
   Completer<String?> eventCompleter = Completer();
   final prefs = await SharedPreferences.getInstance();
   String globalKey = prefs.getString('global_key') ?? '';
@@ -145,14 +148,13 @@ Future<String?> getFriendsLastLocation({
     )
   ]);
 
-  // Connecting to a nostr relay using websocket
-  WebSocket webSocket = await WebSocket.connect(relay);
-
   String? mostRecentEventWithLocation;
+  if (webSocket == null) {
+    await connectWebSocket();
+  }
+  webSocket!.add(requestWithFilter.serialize());
 
-  webSocket.add(requestWithFilter.serialize());
-
-  webSocket.listen((event) {
+  webSocket!.listen((event) {
     // Check if the event contains the string "currentLocation"
     if (event.contains('currentLocation')) {
       String jsonString = getContent(event);
@@ -176,14 +178,13 @@ Future<String?> getFriendsLastLocation({
     // Check if the event contains the string "EOSE"
     if (event.contains('EOSE')) {
       // Close the WebSocket and complete the eventCompleter with the content of the most recent "currentLocation" event
-      webSocket.close().then((_) {
-        if (mostRecentEventWithLocation != null) {
-          String jsonString = getContent(mostRecentEventWithLocation!);
-          eventCompleter.complete(jsonString);
-        } else {
-          eventCompleter.complete(null);
-        }
-      });
+
+      if (mostRecentEventWithLocation != null) {
+        String jsonString = getContent(mostRecentEventWithLocation!);
+        eventCompleter.complete(jsonString);
+      } else {
+        eventCompleter.complete(null);
+      }
     }
   });
 
@@ -191,7 +192,7 @@ Future<String?> getFriendsLastLocation({
 }
 
 Future<String> listenForConfirm({required String publicKey}) async {
-  print(publicKey);
+  print('listening in listenForConfirm function');
   // Create a completer for returning the event
   Completer<String> completer = Completer<String>();
 
@@ -205,30 +206,29 @@ Future<String> listenForConfirm({required String publicKey}) async {
     )
   ]);
 
-  // Connecting to a nostr relay using websocket
-  WebSocket webSocket = await WebSocket.connect(
-    relay, // or any nostr relay
-  );
-
+  if (webSocket == null) {
+    await connectWebSocket();
+  }
   // Send a request message to the WebSocket server
-  webSocket.add(requestWithFilter.serialize());
+  webSocket!.add(requestWithFilter.serialize());
 
-  Timer timer = Timer(const Duration(seconds: loopTime), () async {
-    await webSocket.close();
-  });
+  // Start or restart the timer
+  timer?.cancel();
+  // timer = Timer(loopTime, () async {
+  //   await closeWebSocket();
+  // });
 
-  // Listen for events from the WebSocket server
-  webSocket.listen((event) {
-    print('listening for confirm');
+  // Update the stream subscription handler
+  streamSubscription!.onData((event) {
     print(event);
-    //print('Received event: $event');
     // Complete the completer with the received event
     if (!event.contains("EOSE")) {
       // Complete the completer with the received event if it doesn't contain "EOSE"
       completer.complete(event);
+    } else {
+      // If EOSE event is received, send the request again to continue listening
+      webSocket!.add(requestWithFilter.serialize());
     }
-  }, onDone: () {
-    timer.cancel(); // Cancel the timer when the connection is closed
   });
 
   // Return the future from the completer
@@ -252,21 +252,18 @@ Future<void> postToNostr(String privateKey, String content) async {
   // Instantiate an event with a partial data and let the library sign the event with your private key
   Event eventToSend =
       Event.from(kind: 1, tags: [], content: content, privkey: privateKey);
-  // Connecting to a nostr relay using websocket
-  WebSocket webSocket = await WebSocket.connect(
-    'wss://relay.snort.social', // or any nostr relay
-  );
+
+  if (webSocket == null) {
+    await connectWebSocket();
+  }
   // Send an event to the WebSocket server
-  webSocket.add(eventToSend.serialize());
+  webSocket!.add(eventToSend.serialize());
 
   // Listen for events from the WebSocket server
   await Future.delayed(const Duration(seconds: 1));
-  webSocket.listen((event) {
+  webSocket!.listen((event) {
     print('Received event: $event');
   });
-
-  // Close the WebSocket connection
-  await webSocket.close();
 }
 
 String getContent(String input) {
