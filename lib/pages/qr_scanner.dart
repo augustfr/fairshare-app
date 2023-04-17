@@ -81,11 +81,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
       _currentLocationString = currentLocationString;
     });
     String event = await listenForConfirm(publicKey: pubKey);
-    print('update key event');
-    print(event);
-    print('content:');
     Map<String, dynamic> content = json.decode(getContent(event));
-    print(content);
     String friendName = content['name'];
     String friendLocation = content['currentLocation'];
     String? photoPath =

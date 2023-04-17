@@ -8,7 +8,7 @@ import 'package:synchronized/synchronized.dart';
 
 final _lock = Lock();
 
-String relay = 'wss://relay.snort.social';
+String relay = 'wss://relay.damus.io';
 
 WebSocket? webSocket;
 StreamSubscription<dynamic>? streamSubscription;
@@ -154,7 +154,8 @@ Future<String?> getFriendsLastLocation({
   }
   webSocket!.add(requestWithFilter.serialize());
 
-  webSocket!.listen((event) {
+  StreamSubscription? subscription;
+  subscription = webSocket!.listen((event) {
     // Check if the event contains the string "currentLocation"
     if (event.contains('currentLocation')) {
       String jsonString = getContent(event);
@@ -185,6 +186,7 @@ Future<String?> getFriendsLastLocation({
       } else {
         eventCompleter.complete(null);
       }
+      subscription?.cancel();
     }
   });
 
@@ -192,7 +194,7 @@ Future<String?> getFriendsLastLocation({
 }
 
 Future<String> listenForConfirm({required String publicKey}) async {
-  print('listening in listenForConfirm function');
+  print('listening in listenForConfirm function at: ' + publicKey);
   // Create a completer for returning the event
   Completer<String> completer = Completer<String>();
 

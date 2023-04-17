@@ -40,8 +40,6 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
   }
 
   friendsList.add(jsonEncode(friendData));
-  print('new friends list:');
-  print(friendsList);
   await _lock.synchronized(() async {
     await prefs.setStringList('friends', friendsList);
   });
