@@ -212,22 +212,19 @@ Future<String> listenForConfirm({required String publicKey}) async {
   // Send a request message to the WebSocket server
   webSocket!.add(requestWithFilter.serialize());
 
-  // Start or restart the timer
-  timer?.cancel();
   // timer = Timer(loopTime, () async {
   //   await closeWebSocket();
   // });
 
-  // Update the stream subscription handler
+  bool isCompleted = false;
+
   streamSubscription!.onData((event) {
-    print(event);
-    // Complete the completer with the received event
-    if (!event.contains("EOSE")) {
-      // Complete the completer with the received event if it doesn't contain "EOSE"
+    if (!isCompleted && event.contains("EVENT")) {
+      print('got message in confirm function without eose: ');
+      print(event);
+
       completer.complete(event);
-    } else {
-      // If EOSE event is received, send the request again to continue listening
-      webSocket!.add(requestWithFilter.serialize());
+      isCompleted = true;
     }
   });
 
@@ -261,9 +258,9 @@ Future<void> postToNostr(String privateKey, String content) async {
 
   // Listen for events from the WebSocket server
   await Future.delayed(const Duration(seconds: 1));
-  webSocket!.listen((event) {
-    print('Received event: $event');
-  });
+  // webSocket!.listen((event) {
+  //   print('Received event: $event');
+  // });
 }
 
 String getContent(String input) {
