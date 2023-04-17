@@ -33,11 +33,10 @@ class _FriendsListPageState extends State<FriendsListPage> {
   }
 
   Future<void> _loadFriends() async {
-    print('loadfriends in friendslist page');
     List<String> friendsList = await loadFriends();
     LatLng savedLocation = await getSavedLocation();
 
-    unreadMessageIndexes = (await checkForUnreadMessages(friendsList)).toSet();
+    //unreadMessageIndexes = (await checkForUnreadMessages(friendsList)).toSet();
 
     setState(() {
       _friends = friendsList.map((friend) {

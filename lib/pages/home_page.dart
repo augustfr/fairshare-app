@@ -89,6 +89,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _fetchAndUpdateData() async {
+    print('update loop');
     if (!scannerPageOpen) {
       _isFetchingData = true;
       List<String> friendsList = await loadFriends();
@@ -196,8 +197,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       Map<String, dynamic> friendData = jsonDecode(friendJson);
       String? friendName = friendData['name'];
       String publicKey = getPublicKey(friendData['privateKey']);
+      print('getting friend location');
       final friendLocation =
           await getFriendsLastLocation(publicKeys: [publicKey]);
+      print('got location');
       double? latitude;
       double? longitude;
       if (friendLocation != null) {
@@ -288,7 +291,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           ),
                         );
                         if (friendsListUpdated == true) {
-                          _fetchFriendsLocations(friendsList);
+                          _fetchAndUpdateData();
                         }
                       },
                       shape: const CircleBorder(),
@@ -336,7 +339,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         MaterialPageRoute(
                           builder: (context) => QRScannerPage(
                             onQRScanSuccess: () {
-                              _fetchFriendsLocations(friendsList);
+                              _fetchAndUpdateData();
                             },
                           ),
                         ),

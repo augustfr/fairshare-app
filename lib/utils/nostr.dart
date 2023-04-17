@@ -14,12 +14,22 @@ WebSocket? webSocket;
 StreamSubscription<dynamic>? streamSubscription;
 Timer? timer;
 
+StreamController<String> _streamController =
+    StreamController<String>.broadcast();
+
 Future<void> connectWebSocket() async {
+  // Cancel the existing streamSubscription if it exists
+  if (streamSubscription != null) {
+    await streamSubscription!.cancel();
+    streamSubscription = null;
+  }
+
   if (webSocket == null || webSocket!.readyState == WebSocket.closed) {
     webSocket = await WebSocket.connect(relay);
     streamSubscription = webSocket!.listen((event) {
       print('event received in connectWebSocket function:');
       print(event);
+      _streamController.add(event);
     });
   }
 }
@@ -89,7 +99,8 @@ Future<List<String>> getPreviousEvents(
   // });
 
   // Listen for events from the WebSocket server
-  webSocket!.listen((event) {
+  StreamSubscription? subscription;
+  subscription = _streamController.stream.listen((event) {
     if (event.contains('global_key')) {
       String content = getContent(event);
       if (content.contains('timestamp')) {
@@ -111,6 +122,7 @@ Future<List<String>> getPreviousEvents(
     // Check if the event contains the string "EOSE"
     if (event.contains('EOSE')) {
       eventsCompleter.complete(eventsList);
+      subscription?.cancel();
     }
   });
 
@@ -155,7 +167,7 @@ Future<String?> getFriendsLastLocation({
   webSocket!.add(requestWithFilter.serialize());
 
   StreamSubscription? subscription;
-  subscription = webSocket!.listen((event) {
+  subscription = _streamController.stream.listen((event) {
     // Check if the event contains the string "currentLocation"
     if (event.contains('currentLocation')) {
       String jsonString = getContent(event);
@@ -214,13 +226,10 @@ Future<String> listenForConfirm({required String publicKey}) async {
   // Send a request message to the WebSocket server
   webSocket!.add(requestWithFilter.serialize());
 
-  // timer = Timer(loopTime, () async {
-  //   await closeWebSocket();
-  // });
-
   bool isCompleted = false;
 
   streamSubscription!.onData((event) {
+    //print('listening');
     if (!isCompleted && event.contains("EVENT")) {
       print('got message in confirm function without eose: ');
       print(event);

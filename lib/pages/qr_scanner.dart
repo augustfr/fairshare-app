@@ -220,13 +220,13 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     onPressed: _toggleScan,
                     child: Text(_isScanning ? 'Stop Scanning' : 'Scan'),
                   ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      await postToNostr(_privateKey,
-                          '{"name": "Gene", "currentLocation": "LatLng(37.792520, -122.440140)", "globalKey": "123"}');
-                    },
-                    child: const Text('Debug scanned'),
-                  ),
+                  // ElevatedButton(
+                  //   onPressed: () async {
+                  //     await postToNostr(_privateKey,
+                  //         '{"name": "Gene", "currentLocation": "LatLng(37.792520, -122.440140)", "globalKey": "123"}');
+                  //   },
+                  //   child: const Text('Debug scanned'),
+                  // ),
                   Visibility(
                     visible: _isScanning,
                     child: SizedBox(

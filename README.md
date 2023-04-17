@@ -1,1 +1,1 @@
-# nostr friends
+# FS Trust
