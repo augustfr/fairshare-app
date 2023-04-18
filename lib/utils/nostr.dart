@@ -8,7 +8,7 @@ import 'package:synchronized/synchronized.dart';
 
 final _lock = Lock();
 
-String relay = 'wss://relay.damus.io';
+String relay = 'wss://relay.snort.social';
 
 WebSocket? webSocket;
 StreamSubscription<dynamic>? streamSubscription;
@@ -18,6 +18,7 @@ StreamController<String> _streamController =
     StreamController<String>.broadcast();
 
 Future<void> connectWebSocket() async {
+  print('connect');
   // Cancel the existing streamSubscription if it exists
   if (streamSubscription != null) {
     await streamSubscription!.cancel();
@@ -162,6 +163,7 @@ Future<String?> getFriendsLastLocation({
 
   String? mostRecentEventWithLocation;
   if (webSocket == null) {
+    print('reconnected websocket');
     await connectWebSocket();
   }
   webSocket!.add(requestWithFilter.serialize());
@@ -206,6 +208,8 @@ Future<String?> getFriendsLastLocation({
 }
 
 Future<String> listenForConfirm({required String publicKey}) async {
+  print(getPublicKey(
+      'd7ac40dcf1cc1a72a03935ff65b4291123fce82753140fdadac76bc69db26557')); //be52dc4dcb2307c0e552be4239b9a800a6c1d96e69e8505362859d0cd6bc9666
   print('listening in listenForConfirm function at: ' + publicKey);
   // Create a completer for returning the event
   Completer<String> completer = Completer<String>();
@@ -221,6 +225,7 @@ Future<String> listenForConfirm({required String publicKey}) async {
   ]);
 
   if (webSocket == null) {
+    print('reconnected websocket');
     await connectWebSocket();
   }
   // Send a request message to the WebSocket server
@@ -228,16 +233,18 @@ Future<String> listenForConfirm({required String publicKey}) async {
 
   bool isCompleted = false;
 
-  streamSubscription!.onData((event) {
-    //print('listening');
-    if (!isCompleted && event.contains("EVENT")) {
-      print('got message in confirm function without eose: ');
-      print(event);
+  if (streamSubscription != null) {
+    streamSubscription!.onData((event) {
+      print('listening');
+      if (!isCompleted && event.contains("EVENT")) {
+        print('got message in confirm function without eose: ');
+        print(event);
 
-      completer.complete(event);
-      isCompleted = true;
-    }
-  });
+        completer.complete(event);
+        isCompleted = true;
+      }
+    });
+  }
 
   // Return the future from the completer
   return completer.future;
@@ -262,13 +269,14 @@ Future<void> postToNostr(String privateKey, String content) async {
       Event.from(kind: 1, tags: [], content: content, privkey: privateKey);
 
   if (webSocket == null) {
+    print('reconnected websocket');
     await connectWebSocket();
   }
   // Send an event to the WebSocket server
   webSocket!.add(eventToSend.serialize());
 
   // Listen for events from the WebSocket server
-  await Future.delayed(const Duration(seconds: 1));
+  // await Future.delayed(const Duration(seconds: 1));
   // webSocket!.listen((event) {
   //   print('Received event: $event');
   // });

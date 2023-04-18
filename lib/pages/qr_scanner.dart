@@ -12,7 +12,7 @@ import '../utils/friends.dart';
 import '../utils/location.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-Duration loopTime = const Duration(seconds: 10);
+Duration loopTime = const Duration(seconds: 100);
 
 bool scannerPageOpen = false;
 
@@ -82,19 +82,22 @@ class _QRScannerPageState extends State<QRScannerPage> {
     });
     String event = await listenForConfirm(publicKey: pubKey);
     Map<String, dynamic> content = json.decode(getContent(event));
-    String friendName = content['name'];
-    String friendLocation = content['currentLocation'];
-    String? photoPath =
-        await _promptForPhoto(friendName, privateKey, CameraDevice.rear);
-    Map<String, String> jsonMap = {
-      "name": friendName,
-      "privateKey": privateKey,
-      "currentLocation": friendLocation
-    };
-    String jsonString = json.encode(jsonMap);
-    bool added = await addFriend(jsonString, photoPath);
-    if (added) {
-      widget.onQRScanSuccess();
+    print(content);
+    if (content['name'] != null) {
+      String friendName = content['name'];
+      String friendLocation = content['currentLocation'];
+      String? photoPath =
+          await _promptForPhoto(friendName, privateKey, CameraDevice.rear);
+      Map<String, String> jsonMap = {
+        "name": friendName,
+        "privateKey": privateKey,
+        "currentLocation": friendLocation
+      };
+      String jsonString = json.encode(jsonMap);
+      bool added = await addFriend(jsonString, photoPath);
+      if (added) {
+        widget.onQRScanSuccess();
+      }
     }
     return null;
   }
@@ -220,13 +223,13 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     onPressed: _toggleScan,
                     child: Text(_isScanning ? 'Stop Scanning' : 'Scan'),
                   ),
-                  // ElevatedButton(
-                  //   onPressed: () async {
-                  //     await postToNostr(_privateKey,
-                  //         '{"name": "Gene", "currentLocation": "LatLng(37.792520, -122.440140)", "globalKey": "123"}');
-                  //   },
-                  //   child: const Text('Debug scanned'),
-                  // ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      await postToNostr(_privateKey,
+                          '{"name": "Gene", "currentLocation": "LatLng(37.792520, -122.440140)", "globalKey": "123"}');
+                    },
+                    child: const Text('Debug scanned'),
+                  ),
                   Visibility(
                     visible: _isScanning,
                     child: SizedBox(

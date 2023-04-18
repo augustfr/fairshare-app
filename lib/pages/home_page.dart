@@ -89,7 +89,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _fetchAndUpdateData() async {
-    print('update loop');
+    print('fetch');
     if (!scannerPageOpen) {
       _isFetchingData = true;
       List<String> friendsList = await loadFriends();
