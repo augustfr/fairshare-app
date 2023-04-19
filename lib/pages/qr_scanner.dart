@@ -286,7 +286,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                     prefs.getString('global_key');
                                 if (!isAlreadyAdded) {
                                   String jsonBody =
-                                      '{"type:": "handshake", "name": "' +
+                                      '{"type": "handshake", "name": "' +
                                           (name ?? 'Anonymous') +
                                           '", "currentLocation": "' +
                                           _currentLocationString +

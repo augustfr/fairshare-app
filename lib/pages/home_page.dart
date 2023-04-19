@@ -16,6 +16,8 @@ import '../utils/location.dart';
 
 final _lock = Lock();
 
+bool needsUpdate = false;
+
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -69,7 +71,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         // Check if the distance between the old and new locations is greater than or equal to 0.1 miles
         double distance = getDistance(oldLocation, myCurrentLocation);
         if (distance >= 0.1) {
-          List<String> friendsList = await loadFriends();
+          friendsList = await loadFriends();
           for (final friend in friendsList) {
             Map<String, dynamic> decodedFriend =
                 jsonDecode(friend) as Map<String, dynamic>;
@@ -110,12 +112,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _checkFirstTimeUser();
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _subscribeToLocationUpdates());
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (needsUpdate) {
+        _updateFriendsOnMap();
+      }
+    });
     _initializeAsyncDependencies();
   }
 
   Future<void> _initializeAsyncDependencies() async {
     await connectWebSocket();
     await _fetchAndUpdateData();
+    await _updateFriendsOnMap();
+  }
+
+  Future<void> _updateFriendsOnMap() async {
+    friendsList = await loadFriends();
+    await addFriendsToMap(friendsList);
+    needsUpdate = false;
   }
 
   @override
@@ -170,7 +184,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
   }
 
-  Future<void> _fetchFriendsLocations(friendsList) async {
+  Future<void> addFriendsToMap(friendsList) async {
     BitmapDescriptor customMarkerIcon =
         await _createCircleMarkerIcon(Colors.red, 20);
     Set<Marker> updatedMarkers = {};

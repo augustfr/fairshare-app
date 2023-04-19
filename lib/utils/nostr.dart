@@ -31,13 +31,15 @@ Future<void> connectWebSocket() async {
           print('received event to add new friend');
           addingFriend = content;
         } else if (content['globalKey'] != prefs.getString('global_key') &&
-            content['type'] != 'handshake') {
+            content['type'] != 'handshake' &&
+            content['type'] != null) {
           print('received event from existing friend');
           if (content['type'] == 'locationUpdate') {
             await updateFriendsLocation(content, pubKey);
+            print('updated friends location');
           }
         }
-        await updateFriendsLocation(content, pubKey);
+        //await updateFriendsLocation(content, pubKey);
         print(pubKey + ': ');
         print(content);
       }
@@ -68,8 +70,6 @@ Future<String> addSubscription({required List<String> publicKeys}) async {
 
   webSocket!.add(requestWithFilter.serialize());
   print('added subscription: ' + subscriptionId);
-  print('Keys added: ');
-  print(publicKeys);
 
   return subscriptionId;
 }

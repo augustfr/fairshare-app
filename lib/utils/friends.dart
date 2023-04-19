@@ -1,3 +1,4 @@
+import '../pages/home_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
@@ -45,6 +46,7 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
   });
 
   Vibrate.feedback(FeedbackType.success);
+  needsUpdate = true;
   return true; // Friend added successfully
 }
 
@@ -63,6 +65,7 @@ Future<void> removeFriend(int index) async {
 
     friendsList.removeAt(index);
     await prefs.setStringList('friends', friendsList);
+    needsUpdate = true;
   });
 }
 
@@ -70,6 +73,7 @@ Future<void> removeAllFriends() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
   await prefs.remove('subscribed_keys');
   await prefs.remove('friends');
+  needsUpdate = true;
 }
 
 Future<List<int>> checkForUnreadMessages(friendsList) async {
