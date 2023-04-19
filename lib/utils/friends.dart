@@ -64,6 +64,28 @@ Future<void> setLatestReceivedEvent(int createdAt, String pubKey) async {
   });
 }
 
+Future<void> setLatestLocationUpdate(int createdAt, String pubKey) async {
+  await _lock.synchronized(() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? jsonString = prefs.getString('latestLocationTimestamps');
+    if (jsonString != null) {
+      latestEventTimestamps = json.decode(jsonString) as Map<String, dynamic>;
+    }
+    latestEventTimestamps[pubKey] = createdAt;
+    String newString = json.encode(latestEventTimestamps);
+    await prefs.setString('latestLocationTimestamps', newString);
+  });
+}
+
+Future<int?> getLatestLocationUpdate(String pubKey) async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  String? jsonString = prefs.getString('latestLocationTimestamps');
+  if (jsonString != null) {
+    latestEventTimestamps = json.decode(jsonString) as Map<String, dynamic>;
+  }
+  return latestEventTimestamps[pubKey];
+}
+
 Future<int?> getLatestReceivedEvent(String pubKey) async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
   String? jsonString = prefs.getString('latestEventTimestamps');

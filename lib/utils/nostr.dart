@@ -17,6 +17,8 @@ Map<String, dynamic> addingFriend = {};
 
 Map<String, dynamic> latestEventTimestamps = {};
 
+Map<String, dynamic> latestLocationTimestamps = {};
+
 Future<void> connectWebSocket() async {
   if (webSocket == null || webSocket!.readyState == WebSocket.closed) {
     webSocket = await WebSocket.connect(relay);
@@ -27,18 +29,20 @@ Future<void> connectWebSocket() async {
         Map<String, dynamic> content = json.decode(getContent(event));
         String pubKey = getPubkey(event);
         String globalKey = prefs.getString('global_key') ?? '';
+        int timestamp = getCreatedAt(event);
         if (pubKey == prefs.getString('cycling_pub_key')) {
           print('received event to add new friend');
           addingFriend = content;
+          await setLatestLocationUpdate(timestamp, pubKey);
         } else if (content['globalKey'] != globalKey &&
             content['type'] != 'handshake' &&
             content['type'] != null) {
-          int timestamp = getCreatedAt(event);
           int? lastReceived = await getLatestReceivedEvent(pubKey);
           if (lastReceived == null || timestamp > lastReceived) {
             print('received new event from existing friend');
             if (content['type'] == 'locationUpdate') {
               await updateFriendsLocation(content, pubKey);
+              await setLatestLocationUpdate(timestamp, pubKey);
               print('updated friends location');
             } else if (content['type'] == 'message') {
               String text = content['message'];
