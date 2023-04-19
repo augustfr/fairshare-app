@@ -7,6 +7,7 @@ import './location.dart';
 import './friends.dart';
 import './messages.dart';
 import '../pages/chat_page.dart';
+import '../pages/home_page.dart';
 
 String relay = 'wss://nostr.fairshare.social';
 
@@ -33,7 +34,6 @@ Future<void> connectWebSocket() async {
         if (pubKey == prefs.getString('cycling_pub_key')) {
           print('received event to add new friend');
           addingFriend = content;
-          await setLatestLocationUpdate(timestamp, pubKey);
         } else if (content['globalKey'] != globalKey &&
             content['type'] != 'handshake' &&
             content['type'] != null) {
@@ -49,6 +49,7 @@ Future<void> connectWebSocket() async {
               await addReceivedMessage(
                   pubKey, content['globalKey'], text, timestamp);
               needsMessageUpdate = true;
+              needsUpdate = true;
             }
             await setLatestReceivedEvent(timestamp, pubKey);
           }

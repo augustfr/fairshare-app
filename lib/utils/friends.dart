@@ -41,9 +41,15 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
       friendData['photoPath'] = photoPath;
     }
     friendsList.add(jsonEncode(friendData));
+
+    int timestamp = DateTime.now().millisecondsSinceEpoch;
+    int secondsTimestamp = (timestamp / 1000).round();
+
     await prefs.setStringList('subscribed_keys', subscribedKeys);
     await prefs.setStringList('friends', friendsList);
     await prefs.setString('cycling_pub_key', '');
+    await setLatestLocationUpdate(
+        secondsTimestamp, getPublicKey(friendData['privateKey']));
   });
 
   Vibrate.feedback(FeedbackType.success);
@@ -65,16 +71,14 @@ Future<void> setLatestReceivedEvent(int createdAt, String pubKey) async {
 }
 
 Future<void> setLatestLocationUpdate(int createdAt, String pubKey) async {
-  await _lock.synchronized(() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? jsonString = prefs.getString('latestLocationTimestamps');
-    if (jsonString != null) {
-      latestEventTimestamps = json.decode(jsonString) as Map<String, dynamic>;
-    }
-    latestEventTimestamps[pubKey] = createdAt;
-    String newString = json.encode(latestEventTimestamps);
-    await prefs.setString('latestLocationTimestamps', newString);
-  });
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  String? jsonString = prefs.getString('latestLocationTimestamps');
+  if (jsonString != null) {
+    latestEventTimestamps = json.decode(jsonString) as Map<String, dynamic>;
+  }
+  latestEventTimestamps[pubKey] = createdAt;
+  String newString = json.encode(latestEventTimestamps);
+  await prefs.setString('latestLocationTimestamps', newString);
 }
 
 Future<int?> getLatestLocationUpdate(String pubKey) async {
@@ -142,35 +146,34 @@ Future<List<int>> checkForUnreadMessages(friendsList) async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
 
   List<int> friendsWithUnreadMessages = [];
-  String myGlobalKey = prefs.getString('global_key') ?? '';
   for (int i = 0; i < friendsList.length; i++) {
     Map<String, dynamic> decodedFriend =
         jsonDecode(friendsList[i]) as Map<String, dynamic>;
     String publicKey = getPublicKey(decodedFriend['privateKey']);
+    List<dynamic> messagesHistory = [];
+    String messagesHistoryString = prefs.getString('messagesHistory') ?? '{}';
+    Map<String, dynamic> messagesHistoryMap = jsonDecode(messagesHistoryString);
 
-    // List<String> eventsList = await getPreviousEvents(
-    //   publicKeys: [publicKey],
-    //   friendIndex: i,
-    //   markAsRead: false,
-    // );
-    // if (eventsList.isNotEmpty) {
-    //   String globalKey = getGlobalKey(eventsList.first);
-    //   if (globalKey != myGlobalKey) {
-    //     int currentMessageTimestamp = getTimestamp(eventsList.first);
-    //     if (currentMessageTimestamp > (decodedFriend['latestMessage'] ?? 0)) {
-    //       decodedFriend['hasUnreadMessages'] = true;
-    //       friendsWithUnreadMessages.add(i);
-    //     }
-    //   } else {
-    //     decodedFriend['hasUnreadMessages'] = false;
-    //   }
-    //   friendsList[i] = json.encode(decodedFriend);
-    //   // Update SharedPreferences
-    //   await _lock.synchronized(() async {
-    //     prefs.setStringList('friends', friendsList);
-    //   });
-    // }
+    if (messagesHistoryMap.containsKey(publicKey)) {
+      messagesHistory = messagesHistoryMap[publicKey] as List<dynamic>;
+    }
+    if (messagesHistory.isNotEmpty) {
+      if (messagesHistory.last['type'] == 'received') {
+        int currentMessageTimestamp = messagesHistory.last['timestamp'];
+        if (currentMessageTimestamp >
+            (decodedFriend['latestSeenMessage'] ?? 0)) {
+          decodedFriend['hasUnreadMessages'] = true;
+          friendsWithUnreadMessages.add(i);
+        } else {
+          decodedFriend['hasUnreadMessages'] = false;
+        }
+      }
+      friendsList[i] = json.encode(decodedFriend);
+      // Update SharedPreferences
+      await _lock.synchronized(() async {
+        prefs.setStringList('friends', friendsList);
+      });
+    }
   }
-
   return friendsWithUnreadMessages;
 }

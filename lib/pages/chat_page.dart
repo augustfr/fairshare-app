@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/nostr.dart';
 import '../utils/messages.dart';
+import 'package:synchronized/synchronized.dart';
+import './home_page.dart';
 
 bool needsMessageUpdate = false;
+
+final _lock = Lock();
 
 class ChatPage extends StatefulWidget {
   final String friendName;
@@ -71,7 +75,6 @@ class _ChatPageState extends State<ChatPage> {
       for (var message in messagesHistory) {
         fetchedMessages.add(Message(
             message['message'], message['globalKey'], message['timestamp']));
-        print(message);
       }
       needsMessageUpdate = false;
     }
@@ -90,6 +93,20 @@ class _ChatPageState extends State<ChatPage> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
+    }
+
+    // Update the latestSeenMessage in friendsList
+    if (fetchedMessages.isNotEmpty) {
+      await _lock.synchronized(() async {
+        int latestSeenMessageTimestamp = fetchedMessages.last.timestamp;
+        List<String> friendsList = prefs.getStringList('friends') ?? [];
+        Map<String, dynamic> friendData =
+            jsonDecode(friendsList[widget.friendIndex]) as Map<String, dynamic>;
+        friendData['latestSeenMessage'] = latestSeenMessageTimestamp;
+        friendsList[widget.friendIndex] = json.encode(friendData);
+        await prefs.setStringList('friends', friendsList);
+        needsUpdate = true;
+      });
     }
   }
 

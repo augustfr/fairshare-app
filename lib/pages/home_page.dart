@@ -18,6 +18,8 @@ final _lock = Lock();
 
 bool needsUpdate = false;
 
+Set<int> unreadMessageIndexes = {};
+
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -32,7 +34,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final Set<Marker> _markers = {}; // Add this line to store markers
 
   LatLng myCurrentLocation = const LatLng(0.0, 0.0); // Default value
-  List<int> unreadFriendIndexes = [];
 
   List<String> friendsList = [];
 
@@ -114,7 +115,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         .addPostFrameCallback((_) => _subscribeToLocationUpdates());
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (needsUpdate) {
-        _updateFriendsOnMap();
+        _updateFriendsOnMapAndNotifications();
       }
     });
     _initializeAsyncDependencies();
@@ -123,12 +124,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _initializeAsyncDependencies() async {
     await connectWebSocket();
     await _fetchAndUpdateData();
-    await _updateFriendsOnMap();
+    await _updateFriendsOnMapAndNotifications();
   }
 
-  Future<void> _updateFriendsOnMap() async {
+  Future<void> _updateFriendsOnMapAndNotifications() async {
     friendsList = await loadFriends();
     await addFriendsToMap(friendsList);
+    unreadMessageIndexes = (await checkForUnreadMessages(friendsList)).toSet();
     needsUpdate = false;
   }
 
@@ -265,7 +267,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       child: Stack(
                         children: [
                           const Icon(Icons.menu, color: Colors.black),
-                          if (unreadFriendIndexes.isNotEmpty)
+                          if (unreadMessageIndexes.isNotEmpty)
                             Positioned(
                               top: 0,
                               right: 0,

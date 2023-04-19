@@ -14,6 +14,7 @@ import './profile_page.dart';
 import '../utils/friends.dart';
 import '../utils/location.dart';
 import '../utils/nostr.dart';
+import './home_page.dart';
 
 final _lock = Lock();
 
@@ -25,8 +26,6 @@ class FriendsListPage extends StatefulWidget {
 }
 
 class _FriendsListPageState extends State<FriendsListPage> {
-  final List<Map<String, dynamic>> _friends = [];
-  Set<int> unreadMessageIndexes = {};
   final StreamController<List<Map<String, dynamic>>> _friendsStreamController =
       StreamController<List<Map<String, dynamic>>>.broadcast();
 
@@ -63,8 +62,10 @@ class _FriendsListPageState extends State<FriendsListPage> {
       int? latestLocationUpdate = await getLatestLocationUpdate(pubKey);
       int currentTime = DateTime.now().millisecondsSinceEpoch;
       int secondsTimestamp = (currentTime / 1000).round();
-      int timeElapsed = secondsTimestamp - latestLocationUpdate!;
-      decodedFriend['timeElapsed'] = timeElapsed;
+      if (latestLocationUpdate != null) {
+        int timeElapsed = secondsTimestamp - latestLocationUpdate;
+        decodedFriend['timeElapsed'] = timeElapsed;
+      }
 
       return decodedFriend;
     }).toList();
@@ -72,38 +73,50 @@ class _FriendsListPageState extends State<FriendsListPage> {
     return updatedFriendsFutures;
   }
 
-  String formatDuration(int timeElapsed) {
-    if (timeElapsed < 60) {
-      return '($timeElapsed sec${timeElapsed == 1 ? '' : 's'} ago)';
-    } else if (timeElapsed < 3600) {
-      int minutes = (timeElapsed / 60).round();
-      return '($minutes min${minutes == 1 ? '' : 's'} ago)';
-    } else if (timeElapsed < 86400) {
-      int hours = (timeElapsed / 3600).round();
-      return '($hours hour${hours == 1 ? '' : 's'} ago)';
+  String formatDuration(int? timeElapsed) {
+    if (timeElapsed == null) {
+      return '';
     } else {
-      int days = (timeElapsed / 86400).round();
-      return '($days day${days == 1 ? '' : 's'} ago)';
+      if (timeElapsed < 60) {
+        return '($timeElapsed sec${timeElapsed == 1 ? '' : 's'} ago)';
+      } else if (timeElapsed < 3600) {
+        int minutes = (timeElapsed / 60).round();
+        return '($minutes min${minutes == 1 ? '' : 's'} ago)';
+      } else if (timeElapsed < 86400) {
+        int hours = (timeElapsed / 3600).round();
+        return '($hours hour${hours == 1 ? '' : 's'} ago)';
+      } else {
+        int days = (timeElapsed / 86400).round();
+        return '($days day${days == 1 ? '' : 's'} ago)';
+      }
     }
   }
 
   Future<void> _loadFriends() async {
     List<Map<String, dynamic>> updatedFriends =
         await Future.wait(await _updateFriendsList());
+
     _friendsStreamController.add(updatedFriends);
   }
 
   Future<void> _removeFriend(int index) async {
-    removeFriend(index);
-    setState(() {
-      _friends.removeAt(index);
+    List<Map<String, dynamic>> friendsList =
+        await Future.wait(await _updateFriendsList());
+    friendsList.removeAt(index);
+
+    _friendsStreamController.add(friendsList);
+    await _lock.synchronized(() async {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+          'friends', friendsList.map((friend) => jsonEncode(friend)).toList());
     });
-    Navigator.pop(context, true);
   }
 
   Future<void> _showEditNameDialog(int index) async {
+    List<Map<String, dynamic>> friendsList =
+        await Future.wait(await _updateFriendsList());
     TextEditingController nameController =
-        TextEditingController(text: _friends[index]['name']);
+        TextEditingController(text: friendsList[index]['name']);
 
     return showDialog<void>(
       context: context,
@@ -184,36 +197,35 @@ class _FriendsListPageState extends State<FriendsListPage> {
     );
 
     if (pickedFile != null) {
+      List<Map<String, dynamic>> friendsList =
+          await Future.wait(await _updateFriendsList());
       final Directory directory = await getApplicationDocumentsDirectory();
-      final String newPath = '${directory.path}/${_friends[index]['name']}.png';
+      final String newPath =
+          '${directory.path}/${friendsList[index]['photoPath']}.png';
+
+      friendsList[index]['photoPath'] = newPath;
 
       await File(pickedFile.path).copy(newPath);
-      _friends[index]['photoPath'] = newPath;
-
+      _friendsStreamController.add(friendsList);
       await _lock.synchronized(() async {
         SharedPreferences prefs = await SharedPreferences.getInstance();
-        List<String> friendsList = _friends
-            .map((friend) => jsonEncode(friend))
-            .toList()
-            .cast<String>();
-        await prefs.setStringList('friends', friendsList);
+        await prefs.setStringList('friends',
+            friendsList.map((friend) => jsonEncode(friend)).toList());
       });
-
-      setState(() {});
     }
   }
 
   Future<void> _selectNewName(int index, String name) async {
-    _friends[index]['name'] = name;
+    List<Map<String, dynamic>> friendsList =
+        await Future.wait(await _updateFriendsList());
+    friendsList[index]['name'] = name;
+    _friendsStreamController.add(friendsList);
 
     await _lock.synchronized(() async {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      List<String> friendsList =
-          _friends.map((friend) => jsonEncode(friend)).toList().cast<String>();
-      await prefs.setStringList('friends', friendsList);
+      await prefs.setStringList(
+          'friends', friendsList.map((friend) => jsonEncode(friend)).toList());
     });
-
-    setState(() {});
   }
 
   Future<void> _showConfirmNewPhotoDialog(int index) async {
@@ -262,12 +274,10 @@ class _FriendsListPageState extends State<FriendsListPage> {
                     return Center(child: Text('Error: ${snapshot.error}'));
                   } else {
                     List<Map<String, dynamic>> friends = snapshot.data!;
-                    print(friends);
                     return ListView.builder(
                       itemCount: friends.length,
                       itemBuilder: (BuildContext context, int index) {
                         if (friends.isEmpty) {
-                          print('no friends');
                           return const Center(child: Text('No friends found.'));
                         }
                         Map<String, dynamic> friend = friends[index];
