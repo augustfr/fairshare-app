@@ -10,6 +10,7 @@ import '../pages/chat_page.dart';
 import '../pages/home_page.dart';
 import '../pages/friends_list_page.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../pages/qr_scanner.dart';
 
 String relay = 'wss://nostr.fairshare.social';
 
@@ -37,7 +38,9 @@ Future<void> connectWebSocket() async {
         int timestamp = getCreatedAt(event);
         if (pubKey == prefs.getString('cycling_pub_key') &&
             content['globalKey'] != globalKey) {
+          print('received set to true');
           receivedFriendRequest = true;
+          friendData = content;
           print('received event to add new friend');
           String? privateKey = prefs.getString('cycling_priv_key');
           String? name = prefs.getString('user_name');

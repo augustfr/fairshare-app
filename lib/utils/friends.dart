@@ -21,17 +21,24 @@ Future<List<String>> loadFriends() async {
 Future<bool> addFriend(String rawData, String? photoPath) async {
   final Map<String, dynamic> friendData = jsonDecode(rawData);
   SharedPreferences prefs = await SharedPreferences.getInstance();
+  String? privateKey;
+
+  if (friendData['privateKey'] == null) {
+    privateKey = prefs.getString('cycling_priv_key');
+  } else {
+    privateKey = friendData['privateKey'];
+  }
 
   List<String> friendsList = [];
 
   await _lock.synchronized(() async {
     friendsList = prefs.getStringList('friends') ?? [];
     List<String> subscribedKeys = prefs.getStringList('subscribed_keys') ?? [];
-    subscribedKeys.add(getPublicKey(friendData['privateKey']));
+    subscribedKeys.add(getPublicKey(privateKey));
     // Check if the friend is already in the list
     for (String friend in friendsList) {
       final Map<String, dynamic> existingFriend = jsonDecode(friend);
-      if (existingFriend['privateKey'] == friendData['privateKey']) {
+      if (existingFriend['privateKey'] == privateKey) {
         return false; // Friend is already in the list
       }
     }
@@ -48,8 +55,7 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
     await prefs.setStringList('subscribed_keys', subscribedKeys);
     await prefs.setStringList('friends', friendsList);
     await prefs.setString('cycling_pub_key', '');
-    await setLatestLocationUpdate(
-        secondsTimestamp, getPublicKey(friendData['privateKey']));
+    await setLatestLocationUpdate(secondsTimestamp, getPublicKey(privateKey));
   });
 
   Vibrate.feedback(FeedbackType.success);
