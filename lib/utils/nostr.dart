@@ -18,7 +18,7 @@ Map<String, dynamic> addingFriend = {};
 Future<void> connectWebSocket() async {
   if (webSocket == null || webSocket!.readyState == WebSocket.closed) {
     webSocket = await WebSocket.connect(relay);
-    print('Websocket connection made');
+    print('Websocket connection made ' + relay);
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
     webSocket!.listen((event) async {
