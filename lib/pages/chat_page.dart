@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/nostr.dart';
+import '../utils/messages.dart';
 
 class ChatPage extends StatefulWidget {
   final String friendName;
@@ -40,12 +41,7 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    _initializeEventListeningAndFetchEvents(
-        widget.sharedKey, widget.friendIndex);
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
-      _initializeEventListeningAndFetchEvents(
-          widget.sharedKey, widget.friendIndex);
-    });
+    _displayMessages(widget.sharedKey, widget.friendIndex);
     _getGlobalKey().then((value) {
       setState(() {
         _myGlobalKey = value;
@@ -53,32 +49,23 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  Future<void> _initializeEventListeningAndFetchEvents(
-      String sharedKey, int index) async {
+  Future<void> _displayMessages(String sharedKey, int index) async {
     List<Message> fetchedMessages = [];
     String publicKey = getPublicKey(sharedKey);
-    // List<dynamic> events = await getPreviousEvents(
-    //     publicKeys: [publicKey], friendIndex: index, markAsRead: true);
-    // List<Message> fetchedMessages = [];
 
-    // for (dynamic event in events) {
-    //   Map<String, dynamic> eventData = jsonDecode(event);
+    // Fetch messages from SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getString(publicKey) != null) {
+      List<dynamic> messagesHistory =
+          jsonDecode(prefs.getString(publicKey)!) as List<dynamic>;
+      for (var message in messagesHistory) {
+        fetchedMessages.add(Message(
+            message['message'], message['global_key'], message['timestamp']));
+      }
+    }
 
-    //   if (eventData['message'] == null ||
-    //       eventData['global_key'] == null ||
-    //       eventData['timestamp'] == null) {
-    //     continue;
-    //   }
-
-    //   String message = eventData['message'];
-    //   String globalKey = eventData['global_key'];
-    //   int timestamp = eventData['timestamp'];
-
-    //   fetchedMessages.add(Message(message, globalKey, timestamp));
-    // }
-
-    // // Sort messages by timestamp
-    // fetchedMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    // Sort messages by timestamp
+    fetchedMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     // Clear existing messages and update UI with the fetched messages
     setState(() {
@@ -104,9 +91,6 @@ class _ChatPageState extends State<ChatPage> {
     String globalKey = await _getGlobalKey();
     if (text.trim().isNotEmpty) {
       int timestamp = DateTime.now().millisecondsSinceEpoch;
-      setState(() {
-        _messages.add(Message(text.trim(), globalKey, timestamp));
-      });
 
       _textController.clear();
 
@@ -115,8 +99,10 @@ class _ChatPageState extends State<ChatPage> {
         'global_key': globalKey,
         'message': text.trim(),
       });
-
-      postToNostr(widget.sharedKey, content);
+      String pubKey = getPublicKey(widget.sharedKey);
+      await addSentMessage(pubKey, globalKey, text, timestamp);
+      await postToNostr(widget.sharedKey, content);
+      await _displayMessages(widget.sharedKey, widget.friendIndex);
     }
   }
 

@@ -5,7 +5,8 @@ import 'package:nostr/nostr.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synchronized/synchronized.dart';
 import './location.dart';
-import '../utils/friends.dart';
+import './friends.dart';
+import './messages.dart';
 
 final _lock = Lock();
 
@@ -27,27 +28,29 @@ Future<void> connectWebSocket() async {
       if (event.contains('EVENT')) {
         Map<String, dynamic> content = json.decode(getContent(event));
         String pubKey = getPubkey(event);
-
+        String globalKey = prefs.getString('global_key') ?? '';
         if (pubKey == prefs.getString('cycling_pub_key')) {
           print('received event to add new friend');
           addingFriend = content;
-        } else if (content['globalKey'] != prefs.getString('global_key') &&
+        } else if (content['globalKey'] != globalKey &&
             content['type'] != 'handshake' &&
             content['type'] != null) {
-          print('received event from existing friend');
           int timestamp = getCreatedAt(event);
           int? lastReceived = await getLatestReceivedEvent(pubKey);
           if (lastReceived == null || timestamp > lastReceived) {
+            print('received new event from existing friend');
             if (content['type'] == 'locationUpdate') {
               await updateFriendsLocation(content, pubKey);
               print('updated friends location');
-            } else if (content['type'] == 'message') {}
+            } else if (content['type'] == 'message') {
+              String text = content['message'];
+              await addReceivedMessage(pubKey, globalKey, text, timestamp);
+            }
             await setLatestReceivedEvent(timestamp, pubKey);
           }
         }
-        //await updateFriendsLocation(content, pubKey);
-        print(pubKey + ': ');
-        print(content);
+        // print(pubKey + ': ');
+        // print(content);
       }
     });
   }
