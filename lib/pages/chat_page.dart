@@ -6,6 +6,7 @@ import '../utils/nostr.dart';
 import '../utils/messages.dart';
 import 'package:synchronized/synchronized.dart';
 import './home_page.dart';
+import './friends_list_page.dart';
 
 bool needsMessageUpdate = false;
 
@@ -106,6 +107,7 @@ class _ChatPageState extends State<ChatPage> {
         friendsList[widget.friendIndex] = json.encode(friendData);
         await prefs.setStringList('friends', friendsList);
         needsUpdate = true;
+        needsChatListUpdate = true;
       });
     }
   }

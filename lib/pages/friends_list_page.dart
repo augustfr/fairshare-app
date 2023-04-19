@@ -18,6 +18,8 @@ import './home_page.dart';
 
 final _lock = Lock();
 
+bool needsChatListUpdate = false;
+
 class FriendsListPage extends StatefulWidget {
   const FriendsListPage({Key? key}) : super(key: key);
 
@@ -28,16 +30,24 @@ class FriendsListPage extends StatefulWidget {
 class _FriendsListPageState extends State<FriendsListPage> {
   final StreamController<List<Map<String, dynamic>>> _friendsStreamController =
       StreamController<List<Map<String, dynamic>>>.broadcast();
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _loadFriends();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (needsChatListUpdate) {
+        _loadFriends();
+        needsChatListUpdate = false;
+      }
+    });
   }
 
   @override
   void dispose() {
     _friendsStreamController.close();
+    _timer?.cancel();
     super.dispose();
   }
 

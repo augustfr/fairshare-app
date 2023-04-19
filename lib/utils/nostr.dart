@@ -8,6 +8,7 @@ import './friends.dart';
 import './messages.dart';
 import '../pages/chat_page.dart';
 import '../pages/home_page.dart';
+import '../pages/friends_list_page.dart';
 
 String relay = 'wss://nostr.fairshare.social';
 
@@ -50,6 +51,7 @@ Future<void> connectWebSocket() async {
                   pubKey, content['globalKey'], text, timestamp);
               needsMessageUpdate = true;
               needsUpdate = true;
+              needsChatListUpdate = true;
             }
             await setLatestReceivedEvent(timestamp, pubKey);
           }
