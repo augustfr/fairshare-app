@@ -55,11 +55,13 @@ class _QRScannerPageState extends State<QRScannerPage> {
     });
     _timer2 = Timer.periodic(const Duration(milliseconds: 200), (timer) async {
       _checkIfScanned();
+      print(receivedFriendRequest);
       if (receivedFriendRequest) {
         final String friendName = friendData['name'];
         String? photoPath = await _promptForPhoto(
             friendName, friendData['privateKey'], CameraDevice.rear);
         await addFriend(jsonEncode(friendData), photoPath);
+        receivedFriendRequest = false;
       }
     });
     _loadUserData();
@@ -281,7 +283,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                 _toggleScan(); // Close the scanner immediately
                                 friendData = jsonDecode(barcode.rawValue!);
                                 final String friendName = friendData['name'];
-
+                                String pubKey =
+                                    getPublicKey(friendData['privateKey']);
+                                await addSubscription(publicKeys: [pubKey]);
                                 bool isAlreadyAdded =
                                     await _isFriendAlreadyAdded(
                                         barcode.rawValue!);

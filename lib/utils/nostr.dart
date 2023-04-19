@@ -53,8 +53,8 @@ Future<void> connectWebSocket() async {
               '"}';
           if (privateKey != null) {
             await postToNostr(privateKey, jsonBody);
+            addingFriend = content;
           }
-          addingFriend = content;
         } else if (content['globalKey'] != globalKey &&
             content['type'] != 'handshake' &&
             content['type'] != null) {
@@ -76,8 +76,8 @@ Future<void> connectWebSocket() async {
             await setLatestReceivedEvent(timestamp, pubKey);
           }
         }
-        print(pubKey + ': ');
-        print(content);
+        // print(pubKey + ': ');
+        // print(content);
       }
     });
   }
