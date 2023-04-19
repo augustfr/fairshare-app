@@ -12,7 +12,7 @@ import '../utils/friends.dart';
 import '../utils/location.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-Duration loopTime = const Duration(seconds: 100);
+Duration loopTime = const Duration(seconds: 10);
 
 bool scannerPageOpen = false;
 
@@ -38,8 +38,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
   String _currentLocationString = ''; // declare as state variable
   String currentLocationString = '';
   bool _isLocationAvailable = false;
+  String _previousId = '';
+  bool addingFriendInProgress = false;
 
   late Timer _timer;
+  late Timer _timer2;
 
   @override
   void initState() {
@@ -48,7 +51,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
     scannerPageOpen = true;
     cameraController = MobileScannerController();
     _timer = Timer.periodic(loopTime, (timer) async {
-      _updateKey();
+      if (!addingFriendInProgress) {
+        _updateKey();
+      }
+    });
+    _timer2 = Timer.periodic(const Duration(milliseconds: 200), (timer) async {
+      _checkIfScanned();
     });
     _loadUserData();
   }
@@ -56,7 +64,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
   @override
   void dispose() {
     print('qr code page closed');
+    if (_previousId != '') {
+      closeSubscription(subscriptionId: _previousId);
+    }
     _timer.cancel();
+    _timer2.cancel();
     scannerPageOpen = false;
     cameraController.dispose();
     super.dispose();
@@ -73,33 +85,49 @@ class _QRScannerPageState extends State<QRScannerPage> {
     await _updateKey();
   }
 
-  Future<String?> _updateKey() async {
+  Future<void> _updateKey() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
     String privateKey = generateRandomPrivateKey();
     String pubKey = getPublicKey(privateKey);
+    String? previousId = prefs.getString('cycling_subscription_id');
+    if (previousId != null) {
+      await closeSubscription(subscriptionId: previousId);
+    }
+    String id = await addSubscription(publicKeys: [pubKey]);
+    await prefs.setString('cycling_subscription_id', id);
+    await prefs.setString('cycling_pub_key', pubKey);
+
     setState(() {
+      _previousId = id;
       _privateKey = privateKey;
       _currentLocationString = currentLocationString;
     });
-    String event = await listenForConfirm(publicKey: pubKey);
-    Map<String, dynamic> content = json.decode(getContent(event));
-    print(content);
-    if (content['name'] != null) {
+  }
+
+  Future<void> _checkIfScanned() async {
+    if (addingFriend.isNotEmpty) {
+      addingFriendInProgress = true;
+      Map<String, dynamic> content = addingFriend;
+      addingFriend = {};
       String friendName = content['name'];
       String friendLocation = content['currentLocation'];
+      String globalKey = content['globalKey'];
       String? photoPath =
-          await _promptForPhoto(friendName, privateKey, CameraDevice.rear);
+          await _promptForPhoto(friendName, _privateKey, CameraDevice.rear);
       Map<String, String> jsonMap = {
         "name": friendName,
-        "privateKey": privateKey,
-        "currentLocation": friendLocation
+        "privateKey": _privateKey,
+        "currentLocation": friendLocation,
+        "globalKey": globalKey
       };
       String jsonString = json.encode(jsonMap);
       bool added = await addFriend(jsonString, photoPath);
+
       if (added) {
         widget.onQRScanSuccess();
+        addingFriendInProgress = false;
       }
     }
-    return null;
   }
 
   void _toggleScan() {
@@ -226,7 +254,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                   ElevatedButton(
                     onPressed: () async {
                       await postToNostr(_privateKey,
-                          '{"name": "Gene", "currentLocation": "LatLng(37.792520, -122.440140)", "globalKey": "123"}');
+                          '{"type": "handshake", "name": "Gene", "currentLocation": "LatLng(37.792520, -122.440140)", "globalKey": "123"}');
                     },
                     child: const Text('Debug scanned'),
                   ),
@@ -263,13 +291,14 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                 String? globalKey =
                                     prefs.getString('global_key');
                                 if (!isAlreadyAdded) {
-                                  String jsonBody = '{"name": "' +
-                                      (name ?? 'Anonymous') +
-                                      '", "currentLocation": "' +
-                                      _currentLocationString +
-                                      '", "globalKey": "' +
-                                      (globalKey ?? 'KEY NOT FOUND') +
-                                      '"}';
+                                  String jsonBody =
+                                      '{"type:": "handshake", "name": "' +
+                                          (name ?? 'Anonymous') +
+                                          '", "currentLocation": "' +
+                                          _currentLocationString +
+                                          '", "globalKey": "' +
+                                          (globalKey ?? 'KEY NOT FOUND') +
+                                          '"}';
                                   postToNostr(
                                       friendData['privateKey'], jsonBody);
                                   photoPath = await _promptForPhoto(

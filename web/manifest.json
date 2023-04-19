@@ -1,6 +1,6 @@
 {
-    "name": "google_maps_example",
-    "short_name": "google_maps_example",
+    "name": "fs_trust",
+    "short_name": "fs_trust",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

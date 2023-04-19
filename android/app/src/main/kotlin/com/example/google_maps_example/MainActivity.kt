@@ -1,4 +1,4 @@
-package com.example.google_maps_example
+package com.example.fs_trust
 
 import io.flutter.embedding.android.FlutterActivity
 

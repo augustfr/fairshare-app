@@ -58,13 +58,7 @@ class _FriendsListPageState extends State<FriendsListPage> {
   }
 
   Future<void> _removeFriend(int index) async {
-    await _lock.synchronized(() async {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      List<String> friendsList = prefs.getStringList('friends') ?? [];
-      friendsList.removeAt(index);
-      await prefs.setStringList('friends', friendsList);
-    });
-
+    removeFriend(index);
     setState(() {
       _friends.removeAt(index);
     });

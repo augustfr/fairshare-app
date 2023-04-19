@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_maps_example/pages/home_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/nostr.dart';
 import '../utils/friends.dart';
+import '../pages/home_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);

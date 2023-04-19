@@ -55,29 +55,30 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _initializeEventListeningAndFetchEvents(
       String sharedKey, int index) async {
-    String publicKey = getPublicKey(sharedKey);
-    List<dynamic> events = await getPreviousEvents(
-        publicKeys: [publicKey], friendIndex: index, markAsRead: true);
     List<Message> fetchedMessages = [];
+    String publicKey = getPublicKey(sharedKey);
+    // List<dynamic> events = await getPreviousEvents(
+    //     publicKeys: [publicKey], friendIndex: index, markAsRead: true);
+    // List<Message> fetchedMessages = [];
 
-    for (dynamic event in events) {
-      Map<String, dynamic> eventData = jsonDecode(event);
+    // for (dynamic event in events) {
+    //   Map<String, dynamic> eventData = jsonDecode(event);
 
-      if (eventData['message'] == null ||
-          eventData['global_key'] == null ||
-          eventData['timestamp'] == null) {
-        continue;
-      }
+    //   if (eventData['message'] == null ||
+    //       eventData['global_key'] == null ||
+    //       eventData['timestamp'] == null) {
+    //     continue;
+    //   }
 
-      String message = eventData['message'];
-      String globalKey = eventData['global_key'];
-      int timestamp = eventData['timestamp'];
+    //   String message = eventData['message'];
+    //   String globalKey = eventData['global_key'];
+    //   int timestamp = eventData['timestamp'];
 
-      fetchedMessages.add(Message(message, globalKey, timestamp));
-    }
+    //   fetchedMessages.add(Message(message, globalKey, timestamp));
+    // }
 
-    // Sort messages by timestamp
-    fetchedMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    // // Sort messages by timestamp
+    // fetchedMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     // Clear existing messages and update UI with the fetched messages
     setState(() {

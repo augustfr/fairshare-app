@@ -2,6 +2,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
+import 'dart:convert';
+import './nostr.dart';
+import 'package:synchronized/synchronized.dart';
+
+final _lock = Lock();
 
 Future<LatLng> getSavedLocation() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -16,6 +21,47 @@ Future<LatLng> getCurrentLocation() async {
   final latLng = LatLng(currentLocation.latitude!, currentLocation.longitude!);
 
   return latLng;
+}
+
+Future<void> updateFriendsLocation(
+    Map<String, dynamic> content, String pubKey) async {
+  String globalKey = content['globalKey'];
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  await _lock.synchronized(() async {
+    List<String> friendsList = prefs.getStringList('friends') ?? [];
+    bool isUpdated = false;
+
+    for (int i = 0; i < friendsList.length; i++) {
+      dynamic decodedFriend = jsonDecode(friendsList[i]);
+      if (decodedFriend['globalKey'] == globalKey) {
+        if (getPublicKey(decodedFriend['privateKey']) == pubKey) {
+          String newLocationString = content['currentLocation'];
+          decodedFriend['currentLocation'] = newLocationString;
+
+          // Update the friend in friendsList
+          friendsList[i] = jsonEncode(decodedFriend);
+          isUpdated = true;
+          break;
+        }
+      }
+    }
+
+    // Save the updated friendsList in SharedPreferences if there was an update
+    if (isUpdated) {
+      await prefs.setStringList('friends', friendsList);
+    }
+  });
+}
+
+List<double> parseLatLngFromString(String latLngString) {
+  RegExp regex = RegExp(r'LatLng\(([^,]+),\s*([^)]+)\)');
+  Match? match = regex.firstMatch(latLngString);
+  if (match != null) {
+    double latitude = double.parse(match.group(1) ?? '0');
+    double longitude = double.parse(match.group(2) ?? '0');
+    return [latitude, longitude];
+  }
+  return [0, 0];
 }
 
 double getDistance(LatLng location1, LatLng location2) {

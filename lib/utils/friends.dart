@@ -24,35 +24,51 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
 
   await _lock.synchronized(() async {
     friendsList = prefs.getStringList('friends') ?? [];
-  });
-
-  // Check if the friend is already in the list
-  for (String friend in friendsList) {
-    final Map<String, dynamic> existingFriend = jsonDecode(friend);
-    if (existingFriend['privateKey'] == friendData['privateKey']) {
-      return false; // Friend is already in the list
+    List<String> subscribedKeys = prefs.getStringList('subscribed_keys') ?? [];
+    subscribedKeys.add(getPublicKey(friendData['privateKey']));
+    // Check if the friend is already in the list
+    for (String friend in friendsList) {
+      final Map<String, dynamic> existingFriend = jsonDecode(friend);
+      if (existingFriend['privateKey'] == friendData['privateKey']) {
+        return false; // Friend is already in the list
+      }
     }
-  }
 
-  // Add the photo path to the friend data
-  if (photoPath != null) {
-    friendData['photoPath'] = photoPath;
-  }
-
-  friendsList.add(jsonEncode(friendData));
-  await _lock.synchronized(() async {
+    // Add the photo path to the friend data
+    if (photoPath != null) {
+      friendData['photoPath'] = photoPath;
+    }
+    friendsList.add(jsonEncode(friendData));
+    await prefs.setStringList('subscribed_keys', subscribedKeys);
     await prefs.setStringList('friends', friendsList);
+    await prefs.setString('cycling_pub_key', '');
   });
-
-  // Update friendsList variable stored in SharedPreferences
-  await loadFriends();
 
   Vibrate.feedback(FeedbackType.success);
   return true; // Friend added successfully
 }
 
+Future<void> removeFriend(int index) async {
+  await _lock.synchronized(() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> friendsList = prefs.getStringList('friends') ?? [];
+    List<String> subscribedKeys = prefs.getStringList('subscribed_keys') ?? [];
+    String pubKey = getPublicKey(jsonDecode(friendsList[index])['privateKey']);
+
+    // Check if pubKey exists in subscribedKeys and remove it if it does.
+    if (subscribedKeys.contains(pubKey)) {
+      subscribedKeys.remove(pubKey);
+      await prefs.setStringList('subscribed_keys', subscribedKeys);
+    }
+
+    friendsList.removeAt(index);
+    await prefs.setStringList('friends', friendsList);
+  });
+}
+
 Future<void> removeAllFriends() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
+  await prefs.remove('subscribed_keys');
   await prefs.remove('friends');
 }
 
@@ -66,28 +82,28 @@ Future<List<int>> checkForUnreadMessages(friendsList) async {
         jsonDecode(friendsList[i]) as Map<String, dynamic>;
     String publicKey = getPublicKey(decodedFriend['privateKey']);
 
-    List<String> eventsList = await getPreviousEvents(
-      publicKeys: [publicKey],
-      friendIndex: i,
-      markAsRead: false,
-    );
-    if (eventsList.isNotEmpty) {
-      String globalKey = getGlobalKey(eventsList.first);
-      if (globalKey != myGlobalKey) {
-        int currentMessageTimestamp = getTimestamp(eventsList.first);
-        if (currentMessageTimestamp > (decodedFriend['latestMessage'] ?? 0)) {
-          decodedFriend['hasUnreadMessages'] = true;
-          friendsWithUnreadMessages.add(i);
-        }
-      } else {
-        decodedFriend['hasUnreadMessages'] = false;
-      }
-      friendsList[i] = json.encode(decodedFriend);
-      // Update SharedPreferences
-      await _lock.synchronized(() async {
-        prefs.setStringList('friends', friendsList);
-      });
-    }
+    // List<String> eventsList = await getPreviousEvents(
+    //   publicKeys: [publicKey],
+    //   friendIndex: i,
+    //   markAsRead: false,
+    // );
+    // if (eventsList.isNotEmpty) {
+    //   String globalKey = getGlobalKey(eventsList.first);
+    //   if (globalKey != myGlobalKey) {
+    //     int currentMessageTimestamp = getTimestamp(eventsList.first);
+    //     if (currentMessageTimestamp > (decodedFriend['latestMessage'] ?? 0)) {
+    //       decodedFriend['hasUnreadMessages'] = true;
+    //       friendsWithUnreadMessages.add(i);
+    //     }
+    //   } else {
+    //     decodedFriend['hasUnreadMessages'] = false;
+    //   }
+    //   friendsList[i] = json.encode(decodedFriend);
+    //   // Update SharedPreferences
+    //   await _lock.synchronized(() async {
+    //     prefs.setStringList('friends', friendsList);
+    //   });
+    // }
   }
 
   return friendsWithUnreadMessages;

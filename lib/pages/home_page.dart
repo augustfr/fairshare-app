@@ -76,6 +76,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 jsonDecode(friend) as Map<String, dynamic>;
             String sharedKey = decodedFriend['privateKey'];
             final content = jsonEncode({
+              'type': 'locationUpdate',
               'currentLocation': myCurrentLocation,
               'global_key': globalKey
             });
@@ -89,7 +90,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _fetchAndUpdateData() async {
-    print('fetch');
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> subscribedKeys = prefs.getStringList('subscribed_keys') ?? [];
+    String? currentFriendsSubscription =
+        prefs.getString('friends_subscription_id');
+    if (currentFriendsSubscription != null) {
+      await closeSubscription(subscriptionId: (currentFriendsSubscription));
+    }
+    if (subscribedKeys.isNotEmpty) {
+      String id = await addSubscription(publicKeys: subscribedKeys);
+      await prefs.setString('friends_subscription_id', id);
+    }
+
     if (!scannerPageOpen) {
       _isFetchingData = true;
       List<String> friendsList = await loadFriends();
@@ -115,14 +127,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    connectWebSocket();
     WidgetsBinding.instance.addObserver(this);
     _initialCameraPosition = _getCurrentLocation();
-    _fetchAndUpdateData();
-    _startDataFetchingTimer();
+    //_startDataFetchingTimer();
     _checkFirstTimeUser();
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _subscribeToLocationUpdates());
+    _initializeAsyncDependencies();
+  }
+
+  Future<void> _initializeAsyncDependencies() async {
+    await connectWebSocket();
+    await _fetchAndUpdateData();
   }
 
   @override
@@ -188,7 +204,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
   }
 
-  Future<List<String>> _fetchFriendsLocations(friendsList) async {
+  Future<void> _fetchFriendsLocations(friendsList) async {
     BitmapDescriptor customMarkerIcon =
         await _createCircleMarkerIcon(Colors.red, 20);
     Set<Marker> updatedMarkers = {};
@@ -196,33 +212,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     for (var friendJson in friendsList) {
       Map<String, dynamic> friendData = jsonDecode(friendJson);
       String? friendName = friendData['name'];
-      String publicKey = getPublicKey(friendData['privateKey']);
-      print('getting friend location');
-      final friendLocation =
-          await getFriendsLastLocation(publicKeys: [publicKey]);
-      print('got location');
-      double? latitude;
-      double? longitude;
+      final friendLocation = friendData['currentLocation'];
+
       if (friendLocation != null) {
-        Map<String, dynamic> parsedJson = jsonDecode(friendLocation);
-        // Check if the global_key in the event matches globalKey
-        final prefs = await SharedPreferences.getInstance();
-        String globalKey = prefs.getString('global_key') ?? '';
-
-        if (parsedJson['global_key'] != globalKey) {
-          List<double> currentLocation =
-              parsedJson['currentLocation'].cast<double>();
-          latitude = currentLocation[0];
-          longitude = currentLocation[1];
-          friendData['currentLocation'] = 'LatLng($latitude, $longitude)';
-        }
-      }
-
-      if (friendData['currentLocation'] != null) {
         List<double> currentLocation =
             parseLatLngFromString(friendData['currentLocation']);
-        latitude = currentLocation[0];
-        longitude = currentLocation[1];
+        double latitude = currentLocation[0];
+        double longitude = currentLocation[1];
         updatedMarkers.add(
           Marker(
             markerId: MarkerId(friendName ?? 'Anonymous'),
@@ -231,8 +227,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             icon: customMarkerIcon,
           ),
         );
-
-        friendsList[friendsList.indexOf(friendJson)] = jsonEncode(friendData);
       }
     }
 
@@ -241,19 +235,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _markers.clear();
       _markers.addAll(updatedMarkers);
     });
-
-    return friendsList;
-  }
-
-  List<double> parseLatLngFromString(String latLngString) {
-    RegExp regex = RegExp(r'LatLng\(([^,]+),\s*([^)]+)\)');
-    Match? match = regex.firstMatch(latLngString);
-    if (match != null) {
-      double latitude = double.parse(match.group(1) ?? '0');
-      double longitude = double.parse(match.group(2) ?? '0');
-      return [latitude, longitude];
-    }
-    return [0, 0];
   }
 
   @override
