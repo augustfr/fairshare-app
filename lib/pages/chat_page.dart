@@ -67,7 +67,7 @@ class _ChatPageState extends State<ChatPage> {
           jsonDecode(prefs.getString(publicKey)!) as List<dynamic>;
       for (var message in messagesHistory) {
         fetchedMessages.add(Message(
-            message['message'], message['global_key'], message['timestamp']));
+            message['message'], message['globalKey'], message['timestamp']));
         print(message);
       }
       needsMessageUpdate = false;
@@ -99,6 +99,7 @@ class _ChatPageState extends State<ChatPage> {
     String globalKey = await _getGlobalKey();
     if (text.trim().isNotEmpty) {
       int timestamp = DateTime.now().millisecondsSinceEpoch;
+      int secondsTimestamp = (timestamp / 1000).round();
 
       _textController.clear();
 
@@ -108,7 +109,7 @@ class _ChatPageState extends State<ChatPage> {
         'message': text.trim(),
       });
       String pubKey = getPublicKey(widget.sharedKey);
-      await addSentMessage(pubKey, globalKey, text, timestamp);
+      await addSentMessage(pubKey, globalKey, text, secondsTimestamp);
       await postToNostr(widget.sharedKey, content);
       await _displayMessages(widget.sharedKey, widget.friendIndex);
     }

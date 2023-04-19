@@ -26,7 +26,7 @@ Future<void> connectWebSocket() async {
       if (event.contains('EVENT')) {
         Map<String, dynamic> content = json.decode(getContent(event));
         String pubKey = getPubkey(event);
-        await clearMessageHistory(pubKey);
+        //await clearMessageHistory(pubKey);
 
         String globalKey = prefs.getString('global_key') ?? '';
         if (pubKey == prefs.getString('cycling_pub_key')) {
