@@ -1,12 +1,16 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:synchronized/synchronized.dart';
+
 import 'dart:convert';
+
+final _lock = Lock();
 
 Future<void> addReceivedMessage(
     String pubKey, String globalKey, String message, int timeStamp) async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
   Map<String, dynamic> receivedMessage = {
     'type': 'received',
-    'global_key': globalKey,
+    'globalKey': globalKey,
     'message': message.trim(),
     'timestamp': timeStamp,
   };
@@ -25,7 +29,7 @@ Future<void> addSentMessage(
   SharedPreferences prefs = await SharedPreferences.getInstance();
   Map<String, dynamic> sentMessage = {
     'type': 'sent',
-    'global_key': globalKey,
+    'globalKey': globalKey,
     'message': message.trim(),
     'timestamp': timeStamp,
   };
@@ -37,4 +41,11 @@ Future<void> addSentMessage(
 
   messagesHistory.add(sentMessage);
   prefs.setString(pubKey, jsonEncode(messagesHistory));
+}
+
+Future<void> clearMessageHistory(String pubKey) async {
+  await _lock.synchronized(() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.remove(pubKey);
+  });
 }

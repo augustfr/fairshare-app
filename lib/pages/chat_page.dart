@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/nostr.dart';
 import '../utils/messages.dart';
 
+bool needsMessageUpdate = false;
+
 class ChatPage extends StatefulWidget {
   final String friendName;
   final String sharedKey;
@@ -43,6 +45,11 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     _displayMessages(widget.sharedKey, widget.friendIndex);
     _getGlobalKey().then((value) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (needsMessageUpdate) {
+          _displayMessages(widget.sharedKey, widget.friendIndex);
+        }
+      });
       setState(() {
         _myGlobalKey = value;
       });
@@ -61,12 +68,13 @@ class _ChatPageState extends State<ChatPage> {
       for (var message in messagesHistory) {
         fetchedMessages.add(Message(
             message['message'], message['global_key'], message['timestamp']));
+        print(message);
       }
+      needsMessageUpdate = false;
     }
 
     // Sort messages by timestamp
     fetchedMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-
     // Clear existing messages and update UI with the fetched messages
     setState(() {
       _messages.clear();
@@ -96,7 +104,7 @@ class _ChatPageState extends State<ChatPage> {
 
       String content = jsonEncode({
         'type': 'message',
-        'global_key': globalKey,
+        'globalKey': globalKey,
         'message': text.trim(),
       });
       String pubKey = getPublicKey(widget.sharedKey);
