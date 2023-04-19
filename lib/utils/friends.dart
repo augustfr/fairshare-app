@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter_vibrate/flutter_vibrate.dart';
 import '../utils/nostr.dart';
 import 'package:synchronized/synchronized.dart';
+import './messages.dart';
 
 final _lock = Lock();
 
@@ -83,13 +84,6 @@ Future<void> removeLatestReceivedEvent(String pubKey) async {
   }
 }
 
-Future<void> removeAllLatestEvents() async {
-  await _lock.synchronized(() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.remove('latestEventTimestamps');
-  });
-}
-
 Future<void> removeFriend(int index) async {
   await _lock.synchronized(() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -105,17 +99,20 @@ Future<void> removeFriend(int index) async {
 
     friendsList.removeAt(index);
     await prefs.setStringList('friends', friendsList);
-    print('attempting to remove');
     await removeLatestReceivedEvent(pubKey);
+    await clearMessageHistory(pubKey);
     needsUpdate = true;
   });
 }
 
 Future<void> removeAllFriends() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
-  await prefs.remove('subscribed_keys');
-  await prefs.remove('friends');
-  await removeAllLatestEvents();
+  await _lock.synchronized(() async {
+    await prefs.remove('subscribed_keys');
+    await prefs.remove('friends');
+    await prefs.remove('latestEventTimestamps');
+    await prefs.remove('messagesHistory');
+  });
   needsUpdate = true;
 }
 

@@ -26,8 +26,6 @@ Future<void> connectWebSocket() async {
       if (event.contains('EVENT')) {
         Map<String, dynamic> content = json.decode(getContent(event));
         String pubKey = getPubkey(event);
-        //await clearMessageHistory(pubKey);
-
         String globalKey = prefs.getString('global_key') ?? '';
         if (pubKey == prefs.getString('cycling_pub_key')) {
           print('received event to add new friend');
@@ -44,7 +42,6 @@ Future<void> connectWebSocket() async {
               print('updated friends location');
             } else if (content['type'] == 'message') {
               String text = content['message'];
-              print(content["globalKey"]);
               await addReceivedMessage(
                   pubKey, content['globalKey'], text, timestamp);
               needsMessageUpdate = true;

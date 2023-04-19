@@ -15,13 +15,14 @@ Future<void> addReceivedMessage(
     'timestamp': timeStamp,
   };
 
-  List<dynamic> messagesHistory = [];
-  if (prefs.getString(pubKey) != null) {
-    messagesHistory = jsonDecode(prefs.getString(pubKey)!) as List<dynamic>;
-  }
+  String messagesHistoryString = prefs.getString('messagesHistory') ?? '{}';
+  Map<String, dynamic> messagesHistoryMap = jsonDecode(messagesHistoryString);
 
+  List<dynamic> messagesHistory = messagesHistoryMap[pubKey] ?? [];
   messagesHistory.add(receivedMessage);
-  prefs.setString(pubKey, jsonEncode(messagesHistory));
+
+  messagesHistoryMap[pubKey] = messagesHistory;
+  prefs.setString('messagesHistory', jsonEncode(messagesHistoryMap));
 }
 
 Future<void> addSentMessage(
@@ -34,18 +35,23 @@ Future<void> addSentMessage(
     'timestamp': timeStamp,
   };
 
-  List<dynamic> messagesHistory = [];
-  if (prefs.getString(pubKey) != null) {
-    messagesHistory = jsonDecode(prefs.getString(pubKey)!) as List<dynamic>;
-  }
+  String messagesHistoryString = prefs.getString('messagesHistory') ?? '{}';
+  Map<String, dynamic> messagesHistoryMap = jsonDecode(messagesHistoryString);
 
+  List<dynamic> messagesHistory = messagesHistoryMap[pubKey] ?? [];
   messagesHistory.add(sentMessage);
-  prefs.setString(pubKey, jsonEncode(messagesHistory));
+
+  messagesHistoryMap[pubKey] = messagesHistory;
+  prefs.setString('messagesHistory', jsonEncode(messagesHistoryMap));
 }
 
 Future<void> clearMessageHistory(String pubKey) async {
   await _lock.synchronized(() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.remove(pubKey);
+    String messagesHistoryString = prefs.getString('messagesHistory') ?? '{}';
+    Map<String, dynamic> messagesHistoryMap = jsonDecode(messagesHistoryString);
+
+    messagesHistoryMap.remove(pubKey);
+    prefs.setString('messagesHistory', jsonEncode(messagesHistoryMap));
   });
 }

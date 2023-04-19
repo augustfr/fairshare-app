@@ -62,9 +62,12 @@ class _ChatPageState extends State<ChatPage> {
 
     // Fetch messages from SharedPreferences
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getString(publicKey) != null) {
+    String messagesHistoryString = prefs.getString('messagesHistory') ?? '{}';
+    Map<String, dynamic> messagesHistoryMap = jsonDecode(messagesHistoryString);
+
+    if (messagesHistoryMap.containsKey(publicKey)) {
       List<dynamic> messagesHistory =
-          jsonDecode(prefs.getString(publicKey)!) as List<dynamic>;
+          messagesHistoryMap[publicKey] as List<dynamic>;
       for (var message in messagesHistory) {
         fetchedMessages.add(Message(
             message['message'], message['globalKey'], message['timestamp']));
