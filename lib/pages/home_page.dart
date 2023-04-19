@@ -82,7 +82,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               'currentLocation': myCurrentLocation,
               'global_key': globalKey
             });
-            postToNostr(sharedKey, content);
+            await postToNostr(sharedKey, content);
           }
           // Update oldLocation to myCurrentLocation after posting to Nostr
           oldLocation = myCurrentLocation;

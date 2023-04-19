@@ -9,6 +9,7 @@ import './messages.dart';
 import '../pages/chat_page.dart';
 import '../pages/home_page.dart';
 import '../pages/friends_list_page.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 String relay = 'wss://nostr.fairshare.social';
 
@@ -21,6 +22,8 @@ Map<String, dynamic> latestEventTimestamps = {};
 
 Map<String, dynamic> latestLocationTimestamps = {};
 
+bool receivedFriendRequest = false;
+
 Future<void> connectWebSocket() async {
   if (webSocket == null || webSocket!.readyState == WebSocket.closed) {
     webSocket = await WebSocket.connect(relay);
@@ -32,8 +35,25 @@ Future<void> connectWebSocket() async {
         String pubKey = getPubkey(event);
         String globalKey = prefs.getString('global_key') ?? '';
         int timestamp = getCreatedAt(event);
-        if (pubKey == prefs.getString('cycling_pub_key')) {
+        if (pubKey == prefs.getString('cycling_pub_key') &&
+            content['globalKey'] != globalKey) {
+          receivedFriendRequest = true;
           print('received event to add new friend');
+          String? privateKey = prefs.getString('cycling_priv_key');
+          String? name = prefs.getString('user_name');
+          String? globalKey = prefs.getString('global_key');
+          LatLng savedLocation = await getSavedLocation();
+          String currentLocationString = savedLocation.toString();
+          String jsonBody = '{"type": "handshake", "name": "' +
+              (name ?? 'Anonymous') +
+              '", "currentLocation": "' +
+              currentLocationString +
+              '", "globalKey": "' +
+              (globalKey ?? 'KEY NOT FOUND') +
+              '"}';
+          if (privateKey != null) {
+            await postToNostr(privateKey, jsonBody);
+          }
           addingFriend = content;
         } else if (content['globalKey'] != globalKey &&
             content['type'] != 'handshake' &&

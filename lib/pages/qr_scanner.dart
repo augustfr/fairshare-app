@@ -14,6 +14,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 Duration loopTime = const Duration(seconds: 10);
 
+Map<String, dynamic> friendData = {};
+
 class QRScannerPage extends StatefulWidget {
   final Function onQRScanSuccess;
 
@@ -53,6 +55,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
     });
     _timer2 = Timer.periodic(const Duration(milliseconds: 200), (timer) async {
       _checkIfScanned();
+      if (receivedFriendRequest) {
+        final String friendName = friendData['name'];
+        String? photoPath = await _promptForPhoto(
+            friendName, friendData['privateKey'], CameraDevice.rear);
+        await addFriend(jsonEncode(friendData), photoPath);
+      }
     });
     _loadUserData();
   }
@@ -90,6 +98,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
     String id = await addSubscription(publicKeys: [pubKey]);
     await prefs.setString('cycling_subscription_id', id);
     await prefs.setString('cycling_pub_key', pubKey);
+    await prefs.setString('cycling_priv_key', privateKey);
 
     setState(() {
       _previousId = id;
@@ -270,15 +279,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
                               if (barcode.rawValue != _previousBarcodeValue &&
                                   _isValidQRData(barcode.rawValue)) {
                                 _toggleScan(); // Close the scanner immediately
-                                final Map<String, dynamic> friendData =
-                                    jsonDecode(barcode.rawValue!);
-
+                                friendData = jsonDecode(barcode.rawValue!);
                                 final String friendName = friendData['name'];
 
                                 bool isAlreadyAdded =
                                     await _isFriendAlreadyAdded(
                                         barcode.rawValue!);
-                                String? photoPath;
                                 SharedPreferences prefs =
                                     await SharedPreferences.getInstance();
                                 String? name = prefs.getString('user_name');
@@ -293,13 +299,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                           '", "globalKey": "' +
                                           (globalKey ?? 'KEY NOT FOUND') +
                                           '"}';
-                                  postToNostr(
+                                  await postToNostr(
                                       friendData['privateKey'], jsonBody);
-                                  photoPath = await _promptForPhoto(
-                                      friendName,
-                                      friendData['privateKey'],
-                                      CameraDevice.rear);
-                                  await addFriend(barcode.rawValue!, photoPath);
                                 } else {
                                   _toggleScan();
                                   setState(() {
