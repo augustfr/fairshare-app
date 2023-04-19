@@ -74,13 +74,16 @@ class _FriendsListPageState extends State<FriendsListPage> {
 
   String formatDuration(int timeElapsed) {
     if (timeElapsed < 60) {
-      return '($timeElapsed sec ago)';
+      return '($timeElapsed sec${timeElapsed == 1 ? '' : 's'} ago)';
     } else if (timeElapsed < 3600) {
-      return '(${(timeElapsed / 60).round()} min ago)';
+      int minutes = (timeElapsed / 60).round();
+      return '($minutes min${minutes == 1 ? '' : 's'} ago)';
     } else if (timeElapsed < 86400) {
-      return '(${(timeElapsed / 3600).round()} hours ago)';
+      int hours = (timeElapsed / 3600).round();
+      return '($hours hour${hours == 1 ? '' : 's'} ago)';
     } else {
-      return '(${(timeElapsed / 86400).round()} days ago)';
+      int days = (timeElapsed / 86400).round();
+      return '($days day${days == 1 ? '' : 's'} ago)';
     }
   }
 
