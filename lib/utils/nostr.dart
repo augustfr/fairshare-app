@@ -38,13 +38,12 @@ Future<void> connectWebSocket() async {
         int timestamp = getCreatedAt(event);
         if (pubKey == prefs.getString('cycling_pub_key') &&
             content['globalKey'] != globalKey) {
-          print('received set to true');
-          receivedFriendRequest = true;
-          friendData = content;
-          print('received event to add new friend');
+          //print('received set to true');
+          //receivedFriendRequest = true;
+          // friendData = content;
+          // print('received event to add new friend');
           String? privateKey = prefs.getString('cycling_priv_key');
           String? name = prefs.getString('user_name');
-          String? globalKey = prefs.getString('global_key');
           LatLng savedLocation = await getSavedLocation();
           String currentLocationString = savedLocation.toString();
           String jsonBody = '{"type": "handshake", "name": "' +
@@ -52,7 +51,7 @@ Future<void> connectWebSocket() async {
               '", "currentLocation": "' +
               currentLocationString +
               '", "globalKey": "' +
-              (globalKey ?? 'KEY NOT FOUND') +
+              (globalKey) +
               '"}';
           if (privateKey != null) {
             await postToNostr(privateKey, jsonBody);

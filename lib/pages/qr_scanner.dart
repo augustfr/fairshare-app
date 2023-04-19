@@ -54,25 +54,25 @@ class _QRScannerPageState extends State<QRScannerPage> {
       }
     });
     _timer2 = Timer.periodic(const Duration(milliseconds: 200), (timer) async {
-      //_checkIfScanned();
-      if (receivedFriendRequest) {
-        receivedFriendRequest = false;
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        String? privateKey = prefs.getString('cycling_priv_key');
-        if (privateKey != null) {
-          final String friendName = friendData['name'];
-          String? photoPath =
-              await _promptForPhoto(friendName, privateKey, CameraDevice.rear);
-          Map<String, String> jsonMap = {
-            "name": friendName,
-            "privateKey": _privateKey,
-            "currentLocation": friendData['currentLocation'],
-            "globalKey": friendData['globalKey']
-          };
-          String jsonString = json.encode(jsonMap);
-          await addFriend(jsonString, photoPath);
-        }
-      }
+      _checkIfScanned();
+      // if (receivedFriendRequest) {
+      //   receivedFriendRequest = false;
+      //   SharedPreferences prefs = await SharedPreferences.getInstance();
+      //   String? privateKey = prefs.getString('cycling_priv_key');
+      //   if (privateKey != null) {
+      //     final String friendName = friendData['name'];
+      //     String? photoPath =
+      //         await _promptForPhoto(friendName, privateKey, CameraDevice.rear);
+      //     Map<String, String> jsonMap = {
+      //       "name": friendName,
+      //       "privateKey": _privateKey,
+      //       "currentLocation": friendData['currentLocation'],
+      //       "globalKey": friendData['globalKey']
+      //     };
+      //     String jsonString = json.encode(jsonMap);
+      //     await addFriend(jsonString, photoPath);
+      //   }
+      // }
     });
     _loadUserData();
   }
@@ -119,31 +119,31 @@ class _QRScannerPageState extends State<QRScannerPage> {
     });
   }
 
-  // Future<void> _checkIfScanned() async {
-  //   if (addingFriend.isNotEmpty) {
-  //     addingFriendInProgress = true;
-  //     Map<String, dynamic> content = addingFriend;
-  //     addingFriend = {};
-  //     String friendName = content['name'];
-  //     String friendLocation = content['currentLocation'];
-  //     String globalKey = content['globalKey'];
-  //     String? photoPath =
-  //         await _promptForPhoto(friendName, _privateKey, CameraDevice.rear);
-  //     Map<String, String> jsonMap = {
-  //       "name": friendName,
-  //       "privateKey": _privateKey,
-  //       "currentLocation": friendLocation,
-  //       "globalKey": globalKey
-  //     };
-  //     String jsonString = json.encode(jsonMap);
-  //     bool added = await addFriend(jsonString, photoPath);
+  Future<void> _checkIfScanned() async {
+    if (addingFriend.isNotEmpty) {
+      addingFriendInProgress = true;
+      Map<String, dynamic> content = addingFriend;
+      addingFriend = {};
+      String friendName = content['name'];
+      String friendLocation = content['currentLocation'];
+      String globalKey = content['globalKey'];
+      String? photoPath =
+          await _promptForPhoto(friendName, _privateKey, CameraDevice.rear);
+      Map<String, String> jsonMap = {
+        "name": friendName,
+        "privateKey": _privateKey,
+        "currentLocation": friendLocation,
+        "globalKey": globalKey
+      };
+      String jsonString = json.encode(jsonMap);
+      bool added = await addFriend(jsonString, photoPath);
 
-  //     if (added) {
-  //       widget.onQRScanSuccess();
-  //       addingFriendInProgress = false;
-  //     }
-  //   }
-  // }
+      if (added) {
+        widget.onQRScanSuccess();
+        addingFriendInProgress = false;
+      }
+    }
+  }
 
   void _toggleScan() {
     setState(() {
