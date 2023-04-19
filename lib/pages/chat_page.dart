@@ -104,7 +104,6 @@ class _ChatPageState extends State<ChatPage> {
     String globalKey = await _getGlobalKey();
     if (text.trim().isNotEmpty) {
       int timestamp = DateTime.now().millisecondsSinceEpoch;
-
       setState(() {
         _messages.add(Message(text.trim(), globalKey, timestamp));
       });
@@ -112,9 +111,9 @@ class _ChatPageState extends State<ChatPage> {
       _textController.clear();
 
       String content = jsonEncode({
+        'type': 'message',
         'global_key': globalKey,
         'message': text.trim(),
-        'timestamp': timestamp,
       });
 
       postToNostr(widget.sharedKey, content);

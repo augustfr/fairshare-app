@@ -26,7 +26,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   GoogleMapController? _controller;
   Timer? _timer;
-  bool _isFetchingData = false;
 
   final Set<Marker> _markers = {}; // Add this line to store markers
 
@@ -101,27 +100,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       String id = await addSubscription(publicKeys: subscribedKeys);
       await prefs.setString('friends_subscription_id', id);
     }
-
-    if (!scannerPageOpen) {
-      _isFetchingData = true;
-      List<String> friendsList = await loadFriends();
-      await _fetchFriendsLocations(friendsList);
-      List<int> _unreadFriendIndexes =
-          await checkForUnreadMessages(friendsList);
-
-      setState(() {
-        unreadFriendIndexes = _unreadFriendIndexes;
-      });
-      _isFetchingData = false;
-    }
-  }
-
-  void _startDataFetchingTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 5), (timer) async {
-      if (!_isFetchingData) {
-        await _fetchAndUpdateData();
-      }
-    });
   }
 
   @override
@@ -129,7 +107,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initialCameraPosition = _getCurrentLocation();
-    //_startDataFetchingTimer();
     _checkFirstTimeUser();
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _subscribeToLocationUpdates());
@@ -147,17 +124,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _locationSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // Resume the timer when the HomePage is resumed
-      _startDataFetchingTimer();
-    } else if (state == AppLifecycleState.paused) {
-      // Cancel the timer when the HomePage is paused
-      _timer?.cancel();
-    }
   }
 
   // Method to get current location

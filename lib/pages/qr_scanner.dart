@@ -14,8 +14,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 Duration loopTime = const Duration(seconds: 10);
 
-bool scannerPageOpen = false;
-
 class QRScannerPage extends StatefulWidget {
   final Function onQRScanSuccess;
 
@@ -46,9 +44,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   @override
   void initState() {
-    print('qr code scanner page opened');
     super.initState();
-    scannerPageOpen = true;
     cameraController = MobileScannerController();
     _timer = Timer.periodic(loopTime, (timer) async {
       if (!addingFriendInProgress) {
@@ -63,13 +59,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   @override
   void dispose() {
-    print('qr code page closed');
     if (_previousId != '') {
       closeSubscription(subscriptionId: _previousId);
     }
     _timer.cancel();
     _timer2.cancel();
-    scannerPageOpen = false;
     cameraController.dispose();
     super.dispose();
   }
