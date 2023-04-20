@@ -24,6 +24,7 @@ Map<String, dynamic> latestEventTimestamps = {};
 Map<String, dynamic> latestLocationTimestamps = {};
 
 bool receivedFriendRequest = false;
+String newFriendPrivKey = '';
 
 Future<void> connectWebSocket() async {
   if (webSocket == null || webSocket!.readyState == WebSocket.closed) {
@@ -53,7 +54,10 @@ Future<void> connectWebSocket() async {
           if (privateKey != null && pubKey != scannedPubKey) {
             await postToNostr(privateKey, jsonBody);
           }
-          addingFriend = content;
+          if (privateKey != null) {
+            newFriendPrivKey = privateKey;
+            addingFriend = content;
+          }
         } else if (content['globalKey'] != globalKey &&
             content['type'] != 'handshake' &&
             content['type'] != null) {

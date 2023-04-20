@@ -134,7 +134,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
           await _promptForPhoto(friendName, _privateKey, CameraDevice.rear);
       Map<String, String> jsonMap = {
         "name": friendName,
-        "privateKey": _privateKey,
+        "privateKey": newFriendPrivKey,
         "currentLocation": friendLocation,
         "globalKey": globalKey
       };
@@ -145,7 +145,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
         widget.onQRScanSuccess();
         addingFriendInProgress = false;
       }
-      addingFriend = {};
     }
   }
 
