@@ -101,10 +101,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         Map<String, dynamic> decodedFriend =
             jsonDecode(friend) as Map<String, dynamic>;
         String sharedKey = decodedFriend['privateKey'];
-        String testLocation = 'LatLng(37.769421, -122.486214)';
         final content = jsonEncode({
           'type': 'locationUpdate',
-          'currentLocation': testLocation,
+          'currentLocation': myCurrentLocation.toString(),
           'globalKey': globalKey
         });
         await postToNostr(sharedKey, content);
