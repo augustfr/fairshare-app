@@ -36,12 +36,9 @@ Future<void> connectWebSocket() async {
         String pubKey = getPubkey(event);
         String globalKey = prefs.getString('global_key') ?? '';
         int timestamp = getCreatedAt(event);
-        if (pubKey == prefs.getString('cycling_pub_key') &&
+        if (((pubKey == prefs.getString('cycling_pub_key')) ||
+                pubKey == scannedPubKey) &&
             content['globalKey'] != globalKey) {
-          //print('received set to true');
-          //receivedFriendRequest = true;
-          // friendData = content;
-          // print('received event to add new friend');
           String? privateKey = prefs.getString('cycling_priv_key');
           String? name = prefs.getString('user_name');
           LatLng savedLocation = await getSavedLocation();
@@ -53,10 +50,10 @@ Future<void> connectWebSocket() async {
               '", "globalKey": "' +
               (globalKey) +
               '"}';
-          if (privateKey != null) {
+          if (privateKey != null && pubKey != scannedPubKey) {
             await postToNostr(privateKey, jsonBody);
-            addingFriend = content;
           }
+          addingFriend = content;
         } else if (content['globalKey'] != globalKey &&
             content['type'] != 'handshake' &&
             content['type'] != null) {
@@ -92,6 +89,8 @@ Future<void> closeWebSocket() async {
 
 Future<String> addSubscription({required List<String> publicKeys}) async {
   String subscriptionId = generate64RandomHexChars();
+  print('subscribed pub key:');
+  print(publicKeys);
   Request requestWithFilter = Request(subscriptionId, [
     Filter(
       authors: publicKeys,

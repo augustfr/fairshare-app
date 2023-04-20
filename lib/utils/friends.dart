@@ -19,7 +19,11 @@ Future<List<String>> loadFriends() async {
 }
 
 Future<bool> addFriend(String rawData, String? photoPath) async {
+  print('raw data for adding friend:');
   final Map<String, dynamic> friendData = jsonDecode(rawData);
+  print(friendData);
+  print('pubkey: ' + getPublicKey(friendData['privateKey']));
+
   SharedPreferences prefs = await SharedPreferences.getInstance();
   String? privateKey;
 

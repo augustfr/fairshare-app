@@ -16,6 +16,8 @@ Duration loopTime = const Duration(seconds: 10);
 
 Map<String, dynamic> friendData = {};
 
+String scannedPubKey = '';
+
 class QRScannerPage extends StatefulWidget {
   final Function onQRScanSuccess;
 
@@ -121,6 +123,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   Future<void> _checkIfScanned() async {
     if (addingFriend.isNotEmpty) {
+      print(addingFriend);
       addingFriendInProgress = true;
       Map<String, dynamic> content = addingFriend;
       addingFriend = {};
@@ -142,6 +145,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
         widget.onQRScanSuccess();
         addingFriendInProgress = false;
       }
+      addingFriend = {};
     }
   }
 
@@ -293,9 +297,10 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                 _toggleScan(); // Close the scanner immediately
                                 friendData = jsonDecode(barcode.rawValue!);
                                 final String friendName = friendData['name'];
-                                String pubKey =
+                                scannedPubKey =
                                     getPublicKey(friendData['privateKey']);
-                                await addSubscription(publicKeys: [pubKey]);
+                                await addSubscription(
+                                    publicKeys: [scannedPubKey]);
                                 bool isAlreadyAdded =
                                     await _isFriendAlreadyAdded(
                                         barcode.rawValue!);
