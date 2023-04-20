@@ -25,32 +25,34 @@ Future<LatLng> getCurrentLocation() async {
 
 Future<void> updateFriendsLocation(
     Map<String, dynamic> content, String pubKey) async {
-  String globalKey = content['globalKey'];
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  await _lock.synchronized(() async {
-    List<String> friendsList = prefs.getStringList('friends') ?? [];
-    bool isUpdated = false;
+  String? globalKey = content['globalKey'];
+  if (globalKey != null) {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await _lock.synchronized(() async {
+      List<String> friendsList = prefs.getStringList('friends') ?? [];
+      bool isUpdated = false;
 
-    for (int i = 0; i < friendsList.length; i++) {
-      dynamic decodedFriend = jsonDecode(friendsList[i]);
-      if (decodedFriend['globalKey'] == globalKey) {
-        if (getPublicKey(decodedFriend['privateKey']) == pubKey) {
-          String newLocationString = content['currentLocation'];
-          decodedFriend['currentLocation'] = newLocationString;
+      for (int i = 0; i < friendsList.length; i++) {
+        dynamic decodedFriend = jsonDecode(friendsList[i]);
+        if (decodedFriend['globalKey'] == globalKey) {
+          if (getPublicKey(decodedFriend['privateKey']) == pubKey) {
+            String newLocationString = content['currentLocation'];
+            decodedFriend['currentLocation'] = newLocationString;
 
-          // Update the friend in friendsList
-          friendsList[i] = jsonEncode(decodedFriend);
-          isUpdated = true;
-          break;
+            // Update the friend in friendsList
+            friendsList[i] = jsonEncode(decodedFriend);
+            isUpdated = true;
+            break;
+          }
         }
       }
-    }
 
-    // Save the updated friendsList in SharedPreferences if there was an update
-    if (isUpdated) {
-      await prefs.setStringList('friends', friendsList);
-    }
-  });
+      // Save the updated friendsList in SharedPreferences if there was an update
+      if (isUpdated) {
+        await prefs.setStringList('friends', friendsList);
+      }
+    });
+  }
 }
 
 List<double> parseLatLngFromString(String latLngString) {

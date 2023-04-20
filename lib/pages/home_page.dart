@@ -21,6 +21,8 @@ bool needsUpdate = false;
 
 Set<int> unreadMessageIndexes = {};
 
+bool switchValue = true;
+
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -31,8 +33,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   GoogleMapController? _controller;
   Timer? _timer;
-
-  bool _switchValue = true;
 
   final Set<Marker> _markers = {};
 
@@ -58,7 +58,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void _loadSwitchValue() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _switchValue = prefs.getBool('switchValue') ?? true;
+      switchValue = prefs.getBool('switchValue') ?? true;
     });
   }
 
@@ -72,12 +72,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     double latitude;
     double longitude;
-    LatLng oldLocation = const LatLng(0, 0);
 
     await _lock.synchronized(() async {
       latitude = prefs.getDouble('current_latitude') ?? 0.0;
       longitude = prefs.getDouble('current_longitude') ?? 0.0;
-      oldLocation = LatLng(latitude, longitude);
     });
 
     _locationSubscription =
@@ -89,32 +87,29 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       setState(() {
         myCurrentLocation = LatLng(latitude, longitude);
       });
-
-      await _lock.synchronized(() async {
-        await prefs.setDouble('current_latitude', latitude);
-        await prefs.setDouble('current_longitude', longitude);
-        String globalKey = prefs.getString('global_key') ?? '';
-
-        // Check if the distance between the old and new locations is greater than or equal to 0.1 miles
-        double distance = getDistance(oldLocation, myCurrentLocation);
-        if (distance >= 0.1) {
-          friendsList = await loadFriends();
-          for (final friend in friendsList) {
-            Map<String, dynamic> decodedFriend =
-                jsonDecode(friend) as Map<String, dynamic>;
-            String sharedKey = decodedFriend['privateKey'];
-            final content = jsonEncode({
-              'type': 'locationUpdate',
-              'currentLocation': myCurrentLocation,
-              'global_key': globalKey
-            });
-            await postToNostr(sharedKey, content);
-          }
-          // Update oldLocation to myCurrentLocation after posting to Nostr
-          oldLocation = myCurrentLocation;
-        }
-      });
     });
+  }
+
+  Future<void> sendLocationUpdate() async {
+    friendsList = await loadFriends();
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    String globalKey = prefs.getString('global_key') ?? '';
+    List<double> currentLocationString =
+        parseLatLngFromString(myCurrentLocation.toString());
+    if (currentLocationString[0] != 0.0 && currentLocationString[1] != 0.0) {
+      for (final friend in friendsList) {
+        Map<String, dynamic> decodedFriend =
+            jsonDecode(friend) as Map<String, dynamic>;
+        String sharedKey = decodedFriend['privateKey'];
+        final content = jsonEncode({
+          'type': 'locationUpdate',
+          'currentLocation': myCurrentLocation,
+          'globalKey': globalKey
+        });
+        await postToNostr(sharedKey, content);
+      }
+    }
   }
 
   Future<void> _fetchAndUpdateData() async {
@@ -153,6 +148,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await cleanSubscriptions();
     await _fetchAndUpdateData();
     await _updateFriendsOnMapAndNotifications();
+    if (switchValue) {
+      await sendLocationUpdate();
+    }
   }
 
   Future<void> _updateFriendsOnMapAndNotifications() async {
@@ -325,11 +323,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           child: InkWell(
                             onTap: () {
                               setState(() {
-                                _switchValue = !_switchValue;
+                                switchValue = !switchValue;
                               });
                               _showGhostModePopup(
                                 context,
-                                _switchValue
+                                switchValue
                                     ? 'Ghost mode disabled'
                                     : 'Ghost mode enabled',
                               );
@@ -345,7 +343,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                       alignment: Alignment.centerLeft,
                                       child: Icon(
                                         MdiIcons.ghost,
-                                        color: _switchValue
+                                        color: switchValue
                                             ? Colors.grey
                                             : Colors.red,
                                       ),
@@ -354,7 +352,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                       alignment: Alignment.centerRight,
                                       child: Icon(
                                         Icons.location_on,
-                                        color: _switchValue
+                                        color: switchValue
                                             ? Colors.blue
                                             : Colors.grey,
                                       ),
@@ -362,14 +360,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     Align(
                                       alignment: Alignment.center,
                                       child: Switch(
-                                        value: _switchValue,
+                                        value: switchValue,
                                         onChanged: (bool value) {
                                           setState(() {
-                                            _switchValue = value;
+                                            switchValue = value;
                                           });
                                           _showGhostModePopup(
                                             context,
-                                            _switchValue
+                                            switchValue
                                                 ? 'Ghost mode disabled'
                                                 : 'Ghost mode enabled',
                                           );
