@@ -78,6 +78,7 @@ Future<void> connectWebSocket() async {
                 await updateFriendsLocation(content, pubKey);
                 await setLatestLocationUpdate(timestamp, pubKey);
                 print('updated friends location');
+                needsUpdate = true;
               } else if (content['type'] == 'message') {
                 String text = content['message'];
                 await addReceivedMessage(
