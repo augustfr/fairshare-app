@@ -21,7 +21,7 @@ bool needsUpdate = false;
 
 Set<int> unreadMessageIndexes = {};
 
-bool switchValue = true;
+bool switchValue = true; // true when user wants to be sending location
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -88,14 +88,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // Update latitude and longitude in SharedPreferences
       latitude = currentLocation.latitude ?? 0.0;
       longitude = currentLocation.longitude ?? 0.0;
-      double distance = getDistance(oldLocation, myCurrentLocation);
-      if (distance >= 0.1) {
-        await sendLocationUpdate();
-      }
 
       setState(() {
         myCurrentLocation = LatLng(latitude, longitude);
       });
+
+      double distance = getDistance(oldLocation, myCurrentLocation);
+      if (distance >= 0.1 && switchValue) {
+        await sendLocationUpdate();
+      }
 
       await _lock.synchronized(() async {
         await prefs.setDouble('current_latitude', latitude);

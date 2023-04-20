@@ -134,7 +134,13 @@ class _QRScannerPageState extends State<QRScannerPage> {
     setState(() {
       _isScanning = !_isScanning;
     });
+
     if (_isScanning) {
+      _previousBarcodeValue =
+          null; // Reset the previous barcode value when starting the scanner
+      cameraController.dispose();
+      cameraController =
+          MobileScannerController(); // Re-initialize the controller
       cameraController.start();
     } else {
       cameraController.stop();
@@ -275,13 +281,15 @@ class _QRScannerPageState extends State<QRScannerPage> {
                             for (final barcode in barcodes) {
                               if (barcode.rawValue != _previousBarcodeValue &&
                                   _isValidQRData(barcode.rawValue)) {
-                                _toggleScan(); // Close the scanner immediately
+                                Future.delayed(
+                                    const Duration(milliseconds: 500), () {
+                                  _toggleScan();
+                                });
                                 friendData = jsonDecode(barcode.rawValue!);
                                 final String friendName = friendData['name'];
                                 scannedPubKey =
                                     getPublicKey(friendData['privateKey']);
                                 scannedPrivKey = friendData['privateKey'];
-                                ;
                                 await addSubscription(
                                     publicKeys: [scannedPubKey]);
                                 bool isAlreadyAdded =
@@ -292,18 +300,17 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                 String? name = prefs.getString('user_name');
                                 String? globalKey =
                                     prefs.getString('global_key');
-                                if (!isAlreadyAdded) {
+                                if (!isAlreadyAdded && globalKey != null) {
                                   String jsonBody =
                                       '{"type": "handshake", "name": "' +
                                           (name ?? 'Anonymous') +
                                           '", "currentLocation": "' +
                                           _currentLocationString +
                                           '", "globalKey": "' +
-                                          (globalKey ?? 'KEY NOT FOUND') +
+                                          (globalKey) +
                                           '"}';
                                   await postToNostr(scannedPrivKey, jsonBody);
                                 } else {
-                                  _toggleScan();
                                   setState(() {
                                     qrResult =
                                         '$friendName is already your friend!';
