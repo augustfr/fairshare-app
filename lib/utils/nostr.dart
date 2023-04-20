@@ -26,6 +26,8 @@ Map<String, dynamic> latestLocationTimestamps = {};
 bool receivedFriendRequest = false;
 String newFriendPrivKey = '';
 
+String eventId = '';
+
 Future<void> connectWebSocket() async {
   if (webSocket == null || webSocket!.readyState == WebSocket.closed) {
     webSocket = await WebSocket.connect(relay);
@@ -33,59 +35,63 @@ Future<void> connectWebSocket() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     webSocket!.listen((event) async {
       if (event.contains('EVENT')) {
-        Map<String, dynamic> content = json.decode(getContent(event));
-        String pubKey = getPubkey(event);
-        int? lastReceived = await getLatestReceivedEvent(pubKey);
-        String globalKey = prefs.getString('global_key') ?? '';
-        int timestamp = getCreatedAt(event);
-        if (((pubKey == prefs.getString('cycling_pub_key')) ||
-                pubKey == scannedPubKey) &&
-            content['globalKey'] != globalKey &&
-            (lastReceived == null || timestamp > lastReceived)) {
-          await setLatestReceivedEvent(timestamp, pubKey);
-          String? privateKey = prefs.getString('cycling_priv_key');
-          String? name = prefs.getString('user_name');
-          LatLng savedLocation = await getSavedLocation();
-          String currentLocationString = savedLocation.toString();
-          String jsonBody = '{"type": "handshake", "name": "' +
-              (name ?? 'Anonymous') +
-              '", "currentLocation": "' +
-              currentLocationString +
-              '", "globalKey": "' +
-              (globalKey) +
-              '"}';
-          if (privateKey != null && pubKey != scannedPubKey) {
-            await postToNostr(privateKey, jsonBody);
-            newFriendPrivKey = privateKey;
-          } else {
-            newFriendPrivKey = scannedPrivKey;
-          }
-          if (privateKey != null) {
-            addingFriend = content;
-          }
-        } else if (content['globalKey'] != globalKey &&
-            content['type'] != 'handshake' &&
-            content['type'] != null &&
-            content['globalKey'] != null) {
-          if (lastReceived == null || timestamp > lastReceived) {
-            print('received new event from existing friend');
-            if (content['type'] == 'locationUpdate') {
-              await updateFriendsLocation(content, pubKey);
-              await setLatestLocationUpdate(timestamp, pubKey);
-              print('updated friends location');
-            } else if (content['type'] == 'message') {
-              String text = content['message'];
-              await addReceivedMessage(
-                  pubKey, content['globalKey'], text, timestamp);
-              needsMessageUpdate = true;
-              needsUpdate = true;
-              needsChatListUpdate = true;
-            }
+        String currentEventId = getEventId(event);
+        if (currentEventId != eventId) {
+          eventId = currentEventId;
+          Map<String, dynamic> content = json.decode(getContent(event));
+          String pubKey = getPubkey(event);
+          int? lastReceived = await getLatestReceivedEvent(pubKey);
+          String globalKey = prefs.getString('global_key') ?? '';
+          int timestamp = getCreatedAt(event);
+          if (((pubKey == prefs.getString('cycling_pub_key')) ||
+                  pubKey == scannedPubKey) &&
+              content['globalKey'] != globalKey &&
+              (lastReceived == null || timestamp > lastReceived)) {
             await setLatestReceivedEvent(timestamp, pubKey);
+            String? privateKey = prefs.getString('cycling_priv_key');
+            String? name = prefs.getString('user_name');
+            LatLng savedLocation = await getSavedLocation();
+            String currentLocationString = savedLocation.toString();
+            String jsonBody = '{"type": "handshake", "name": "' +
+                (name ?? 'Anonymous') +
+                '", "currentLocation": "' +
+                currentLocationString +
+                '", "globalKey": "' +
+                (globalKey) +
+                '"}';
+            if (privateKey != null && pubKey != scannedPubKey) {
+              await postToNostr(privateKey, jsonBody);
+              newFriendPrivKey = privateKey;
+            } else {
+              newFriendPrivKey = scannedPrivKey;
+            }
+            if (privateKey != null) {
+              addingFriend = content;
+            }
+          } else if (content['globalKey'] != globalKey &&
+              content['type'] != 'handshake' &&
+              content['type'] != null &&
+              content['globalKey'] != null) {
+            if (lastReceived == null || timestamp > lastReceived) {
+              print('received new event from existing friend');
+              if (content['type'] == 'locationUpdate') {
+                await updateFriendsLocation(content, pubKey);
+                await setLatestLocationUpdate(timestamp, pubKey);
+                print('updated friends location');
+              } else if (content['type'] == 'message') {
+                String text = content['message'];
+                await addReceivedMessage(
+                    pubKey, content['globalKey'], text, timestamp);
+                needsMessageUpdate = true;
+                needsUpdate = true;
+                needsChatListUpdate = true;
+              }
+              await setLatestReceivedEvent(timestamp, pubKey);
+            }
           }
+          // print(pubKey + ': ');
+          // print(content);
         }
-        // print(pubKey + ': ');
-        // print(content);
       }
     });
   }
@@ -159,6 +165,17 @@ int getCreatedAt(String input) {
 
   // Get the content field from the third element of the list
   int content = list[2]['created_at'];
+
+  // Return the content
+  return content;
+}
+
+String getEventId(String input) {
+  // Parse the input string into a list
+  List<dynamic> list = jsonDecode(input);
+
+  // Get the content field from the third element of the list
+  String content = list[2]['id'];
 
   // Return the content
   return content;
