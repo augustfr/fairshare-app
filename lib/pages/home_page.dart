@@ -93,7 +93,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> sendLocationUpdate() async {
     friendsList = await loadFriends();
     SharedPreferences prefs = await SharedPreferences.getInstance();
-
     String globalKey = prefs.getString('global_key') ?? '';
     List<double> currentLocationString =
         parseLatLngFromString(myCurrentLocation.toString());
@@ -104,7 +103,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         String sharedKey = decodedFriend['privateKey'];
         final content = jsonEncode({
           'type': 'locationUpdate',
-          'currentLocation': myCurrentLocation,
+          'currentLocation': myCurrentLocation.toString(),
           'globalKey': globalKey
         });
         await postToNostr(sharedKey, content);
@@ -155,6 +154,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _updateFriendsOnMapAndNotifications() async {
     friendsList = await loadFriends();
+    print(friendsList);
     await addFriendsToMap(friendsList);
     unreadMessageIndexes = (await checkForUnreadMessages(friendsList)).toSet();
     needsUpdate = false;

@@ -66,7 +66,7 @@ Future<void> connectWebSocket() async {
         } else if (content['globalKey'] != globalKey &&
             content['type'] != 'handshake' &&
             content['type'] != null &&
-            content['gloablKey'] != null) {
+            content['globalKey'] != null) {
           if (lastReceived == null || timestamp > lastReceived) {
             print('received new event from existing friend');
             if (content['type'] == 'locationUpdate') {

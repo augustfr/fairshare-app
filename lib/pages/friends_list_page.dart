@@ -63,11 +63,9 @@ class _FriendsListPageState extends State<FriendsListPage> {
       double latitude = currentLocation[0];
       double longitude = currentLocation[1];
       LatLng friendLatLng = LatLng(latitude, longitude);
-
       double distance = getDistance(savedLocation, friendLatLng);
       String distanceString = distance.toString() + 'm';
       decodedFriend['distance'] = distanceString;
-
       String pubKey = getPublicKey(decodedFriend['privateKey']);
       int? latestLocationUpdate = await getLatestLocationUpdate(pubKey);
       int currentTime = DateTime.now().millisecondsSinceEpoch;
