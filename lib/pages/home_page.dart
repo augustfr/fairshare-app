@@ -123,6 +123,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _initializeAsyncDependencies() async {
     await connectWebSocket();
+    await cleanSubscriptions();
     await _fetchAndUpdateData();
     await _updateFriendsOnMapAndNotifications();
   }

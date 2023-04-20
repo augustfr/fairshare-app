@@ -110,16 +110,10 @@ class _FriendsListPageState extends State<FriendsListPage> {
   }
 
   Future<void> _removeFriend(int index) async {
+    await removeFriend(index);
     List<Map<String, dynamic>> friendsList =
         await Future.wait(await _updateFriendsList());
-    friendsList.removeAt(index);
-
     _friendsStreamController.add(friendsList);
-    await _lock.synchronized(() async {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(
-          'friends', friendsList.map((friend) => jsonEncode(friend)).toList());
-    });
   }
 
   Future<void> _showEditNameDialog(int index) async {

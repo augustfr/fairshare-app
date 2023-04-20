@@ -1,3 +1,4 @@
+import '../pages/qr_scanner.dart';
 import '../pages/home_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -60,6 +61,7 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
     await prefs.setStringList('friends', friendsList);
     await prefs.setString('cycling_pub_key', '');
     await setLatestLocationUpdate(secondsTimestamp, getPublicKey(privateKey));
+    scannedPubKey = '';
   });
 
   Vibrate.feedback(FeedbackType.success);
@@ -118,6 +120,32 @@ Future<void> removeLatestReceivedEvent(String pubKey) async {
     String newString = json.encode(latestEventTimestamps);
     await prefs.setString('latestEventTimestamps', newString);
   }
+}
+
+Future<void> cleanSubscriptions() async {
+  await _lock.synchronized(() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> friendsList = prefs.getStringList('friends') ?? [];
+    List<String> subscribedKeys = prefs.getStringList('subscribed_keys') ?? [];
+    bool modified = false;
+    List<String> keysToRemove = [];
+
+    Set<String> friendsPubKeys = friendsList
+        .map((friend) => getPublicKey(jsonDecode(friend)['privateKey']))
+        .toSet();
+
+    for (final key in subscribedKeys) {
+      if (!friendsPubKeys.contains(key)) {
+        keysToRemove.add(key);
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      subscribedKeys.removeWhere((key) => keysToRemove.contains(key));
+      await prefs.setStringList('subscribed_keys', subscribedKeys);
+    }
+  });
 }
 
 Future<void> removeFriend(int index) async {

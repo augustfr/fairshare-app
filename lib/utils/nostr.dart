@@ -80,8 +80,8 @@ Future<void> connectWebSocket() async {
               needsUpdate = true;
               needsChatListUpdate = true;
             }
+            await setLatestReceivedEvent(timestamp, pubKey);
           }
-          await setLatestReceivedEvent(timestamp, pubKey);
         }
         // print(pubKey + ': ');
         // print(content);
@@ -112,7 +112,8 @@ Future<String> addSubscription({required List<String> publicKeys}) async {
   }
 
   webSocket!.add(requestWithFilter.serialize());
-  print('added subscription: ' + subscriptionId);
+  print('added subscription (id: ' + subscriptionId + '):');
+  print(publicKeys);
 
   return subscriptionId;
 }
@@ -126,7 +127,7 @@ Future<void> closeSubscription({required String subscriptionId}) async {
   }
 
   webSocket!.add(close.serialize());
-  print('closed subscription: ' + subscriptionId);
+  print('closed subscription (id: ' + subscriptionId + ')');
 }
 
 String getPubkey(String input) {
