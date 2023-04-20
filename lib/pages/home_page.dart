@@ -65,6 +65,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void _saveSwitchValue(bool value) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('switchValue', value);
+    if (value) {
+      await sendLocationUpdate();
+    }
   }
 
   void _subscribeToLocationUpdates() async {
@@ -72,10 +75,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     double latitude;
     double longitude;
+    LatLng oldLocation = const LatLng(0, 0);
 
     await _lock.synchronized(() async {
       latitude = prefs.getDouble('current_latitude') ?? 0.0;
       longitude = prefs.getDouble('current_longitude') ?? 0.0;
+      oldLocation = LatLng(latitude, longitude);
     });
 
     _locationSubscription =
@@ -83,6 +88,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // Update latitude and longitude in SharedPreferences
       latitude = currentLocation.latitude ?? 0.0;
       longitude = currentLocation.longitude ?? 0.0;
+      double distance = getDistance(oldLocation, myCurrentLocation);
+      if (distance >= 0.1) {
+        await sendLocationUpdate();
+      }
 
       setState(() {
         myCurrentLocation = LatLng(latitude, longitude);

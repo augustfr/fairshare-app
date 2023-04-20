@@ -62,6 +62,7 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
     await prefs.setString('cycling_pub_key', '');
     await setLatestLocationUpdate(secondsTimestamp, getPublicKey(privateKey));
     scannedPubKey = '';
+    needsUpdate = true;
   });
 
   Vibrate.feedback(FeedbackType.success);
