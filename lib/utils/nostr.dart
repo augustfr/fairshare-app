@@ -35,11 +35,14 @@ Future<void> connectWebSocket() async {
       if (event.contains('EVENT')) {
         Map<String, dynamic> content = json.decode(getContent(event));
         String pubKey = getPubkey(event);
+        int? lastReceived = await getLatestReceivedEvent(pubKey);
         String globalKey = prefs.getString('global_key') ?? '';
         int timestamp = getCreatedAt(event);
         if (((pubKey == prefs.getString('cycling_pub_key')) ||
                 pubKey == scannedPubKey) &&
-            content['globalKey'] != globalKey) {
+            content['globalKey'] != globalKey &&
+            (lastReceived == null || timestamp > lastReceived)) {
+          await setLatestReceivedEvent(timestamp, pubKey);
           String? privateKey = prefs.getString('cycling_priv_key');
           String? name = prefs.getString('user_name');
           LatLng savedLocation = await getSavedLocation();
@@ -53,15 +56,16 @@ Future<void> connectWebSocket() async {
               '"}';
           if (privateKey != null && pubKey != scannedPubKey) {
             await postToNostr(privateKey, jsonBody);
+            newFriendPrivKey = privateKey;
+          } else {
+            newFriendPrivKey = scannedPrivKey;
           }
           if (privateKey != null) {
-            newFriendPrivKey = privateKey;
             addingFriend = content;
           }
         } else if (content['globalKey'] != globalKey &&
             content['type'] != 'handshake' &&
             content['type'] != null) {
-          int? lastReceived = await getLatestReceivedEvent(pubKey);
           if (lastReceived == null || timestamp > lastReceived) {
             print('received new event from existing friend');
             if (content['type'] == 'locationUpdate') {
@@ -76,8 +80,8 @@ Future<void> connectWebSocket() async {
               needsUpdate = true;
               needsChatListUpdate = true;
             }
-            await setLatestReceivedEvent(timestamp, pubKey);
           }
+          await setLatestReceivedEvent(timestamp, pubKey);
         }
         // print(pubKey + ': ');
         // print(content);
@@ -93,8 +97,6 @@ Future<void> closeWebSocket() async {
 
 Future<String> addSubscription({required List<String> publicKeys}) async {
   String subscriptionId = generate64RandomHexChars();
-  print('subscribed pub key:');
-  print(publicKeys);
   Request requestWithFilter = Request(subscriptionId, [
     Filter(
       authors: publicKeys,
@@ -184,10 +186,4 @@ Future<void> postToNostr(String privateKey, String content) async {
   }
   // Send an event to the WebSocket server
   webSocket!.add(eventToSend.serialize());
-
-  // Listen for events from the WebSocket server
-  // await Future.delayed(const Duration(seconds: 1));
-  // webSocket!.listen((event) {
-  //   print('Received event: $event');
-  // });
 }

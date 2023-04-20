@@ -17,6 +17,7 @@ Duration loopTime = const Duration(seconds: 10);
 Map<String, dynamic> friendData = {};
 
 String scannedPubKey = '';
+String scannedPrivKey = '';
 
 class QRScannerPage extends StatefulWidget {
   final Function onQRScanSuccess;
@@ -56,25 +57,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
       }
     });
     _timer2 = Timer.periodic(const Duration(milliseconds: 200), (timer) async {
-      _checkIfScanned();
-      // if (receivedFriendRequest) {
-      //   receivedFriendRequest = false;
-      //   SharedPreferences prefs = await SharedPreferences.getInstance();
-      //   String? privateKey = prefs.getString('cycling_priv_key');
-      //   if (privateKey != null) {
-      //     final String friendName = friendData['name'];
-      //     String? photoPath =
-      //         await _promptForPhoto(friendName, privateKey, CameraDevice.rear);
-      //     Map<String, String> jsonMap = {
-      //       "name": friendName,
-      //       "privateKey": _privateKey,
-      //       "currentLocation": friendData['currentLocation'],
-      //       "globalKey": friendData['globalKey']
-      //     };
-      //     String jsonString = json.encode(jsonMap);
-      //     await addFriend(jsonString, photoPath);
-      //   }
-      // }
+      _checkReceivedConfirm();
     });
     _loadUserData();
   }
@@ -121,9 +104,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
     });
   }
 
-  Future<void> _checkIfScanned() async {
+  Future<void> _checkReceivedConfirm() async {
     if (addingFriend.isNotEmpty) {
-      print(addingFriend);
       addingFriendInProgress = true;
       Map<String, dynamic> content = addingFriend;
       addingFriend = {};
@@ -298,6 +280,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                 final String friendName = friendData['name'];
                                 scannedPubKey =
                                     getPublicKey(friendData['privateKey']);
+                                scannedPrivKey = friendData['privateKey'];
+                                ;
                                 await addSubscription(
                                     publicKeys: [scannedPubKey]);
                                 bool isAlreadyAdded =
@@ -317,8 +301,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                           '", "globalKey": "' +
                                           (globalKey ?? 'KEY NOT FOUND') +
                                           '"}';
-                                  await postToNostr(
-                                      friendData['privateKey'], jsonBody);
+                                  await postToNostr(scannedPrivKey, jsonBody);
                                 } else {
                                   _toggleScan();
                                   setState(() {

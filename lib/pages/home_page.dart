@@ -129,9 +129,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _updateFriendsOnMapAndNotifications() async {
     friendsList = await loadFriends();
-    print(friendsList);
-    print(getPublicKey(
-        'baab1ace2aa127319a5613061bfc7b1524fec02a1bd7d69c84bf256b2d92f70c'));
     await addFriendsToMap(friendsList);
     unreadMessageIndexes = (await checkForUnreadMessages(friendsList)).toSet();
     needsUpdate = false;
