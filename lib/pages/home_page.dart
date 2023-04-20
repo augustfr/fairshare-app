@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,15 +32,40 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   GoogleMapController? _controller;
   Timer? _timer;
 
-  final Set<Marker> _markers = {}; // Add this line to store markers
+  bool _switchValue = true;
 
-  LatLng myCurrentLocation = const LatLng(0.0, 0.0); // Default value
+  final Set<Marker> _markers = {};
+
+  LatLng myCurrentLocation = const LatLng(0.0, 0.0);
 
   List<String> friendsList = [];
 
   late Future<CameraPosition> _initialCameraPosition;
 
   StreamSubscription<LocationData>? _locationSubscription;
+
+  void _showGhostModePopup(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.fromLTRB(15, 15, 15, 0),
+      ),
+    );
+  }
+
+  void _loadSwitchValue() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _switchValue = prefs.getBool('switchValue') ?? true;
+    });
+  }
+
+  void _saveSwitchValue(bool value) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('switchValue', value);
+  }
 
   void _subscribeToLocationUpdates() async {
     final location = Location();
@@ -108,6 +134,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _loadSwitchValue();
     WidgetsBinding.instance.addObserver(this);
     _initialCameraPosition = _getCurrentLocation();
     _checkFirstTimeUser();
@@ -282,6 +309,80 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               ),
                             ),
                         ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 40,
+                    left: 10,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20.0),
+                      child: Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.all(2),
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _switchValue = !_switchValue;
+                              });
+                              _showGhostModePopup(
+                                context,
+                                _switchValue
+                                    ? 'Ghost mode disabled'
+                                    : 'Ghost mode enabled',
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              width: 90,
+                              height: 56,
+                              child: Center(
+                                child: Stack(
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Icon(
+                                        MdiIcons.ghost,
+                                        color: _switchValue
+                                            ? Colors.grey
+                                            : Colors.red,
+                                      ),
+                                    ),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Icon(
+                                        Icons.location_on,
+                                        color: _switchValue
+                                            ? Colors.blue
+                                            : Colors.grey,
+                                      ),
+                                    ),
+                                    Align(
+                                      alignment: Alignment.center,
+                                      child: Switch(
+                                        value: _switchValue,
+                                        onChanged: (bool value) {
+                                          setState(() {
+                                            _switchValue = value;
+                                          });
+                                          _showGhostModePopup(
+                                            context,
+                                            _switchValue
+                                                ? 'Ghost mode disabled'
+                                                : 'Ghost mode enabled',
+                                          );
+                                          _saveSwitchValue(value);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
