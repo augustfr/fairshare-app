@@ -36,7 +36,7 @@ Future<void> updateFriendsLocation(
         dynamic decodedFriend = jsonDecode(friendsList[i]);
         if (decodedFriend['globalKey'] == globalKey) {
           if (getPublicKey(decodedFriend['privateKey']) == pubKey) {
-            List<dynamic> newLocationString = content['currentLocation'];
+            String newLocationString = content['currentLocation'];
             decodedFriend['currentLocation'] = newLocationString;
 
             // Update the friend in friendsList
