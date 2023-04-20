@@ -37,7 +37,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
   String? _previousBarcodeValue;
   String _userName = '';
   String _privateKey = '';
-  bool _isScanning = false;
   String _currentLocationString = ''; // declare as state variable
   String currentLocationString = '';
   bool _isLocationAvailable = false;
@@ -51,6 +50,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
   void initState() {
     super.initState();
     cameraController = MobileScannerController();
+    cameraController.start(); // Start the camera when the page is initialized
     _timer = Timer.periodic(loopTime, (timer) async {
       if (!addingFriendInProgress) {
         _updateKey();
@@ -127,23 +127,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
         widget.onQRScanSuccess();
         addingFriendInProgress = false;
       }
-    }
-  }
-
-  void _toggleScan() {
-    setState(() {
-      _isScanning = !_isScanning;
-    });
-
-    if (_isScanning) {
-      _previousBarcodeValue =
-          null; // Reset the previous barcode value when starting the scanner
-      cameraController.dispose();
-      cameraController =
-          MobileScannerController(); // Re-initialize the controller
-      cameraController.start();
-    } else {
-      cameraController.stop();
     }
   }
 
@@ -248,43 +231,26 @@ class _QRScannerPageState extends State<QRScannerPage> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              padding: const EdgeInsets.fromLTRB(10, 50, 10, 10),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ElevatedButton(
-                    onPressed: _toggleScan,
-                    child: Text(_isScanning ? 'Stop Scanning' : 'Scan'),
-                  ),
-                  // ElevatedButton(
-                  //   onPressed: () async {
-                  //     await postToNostr(_privateKey,
-                  //         '{"type": "handshake", "name": "Gene", "currentLocation": "LatLng(37.792520, -122.440140)", "globalKey": "123"}');
-                  //   },
-                  //   child: const Text('Debug scanned'),
-                  // ),
-                  Visibility(
-                    visible: _isScanning,
+                  Center(
                     child: SizedBox(
-                      width: MediaQuery.of(context).size.width * 0.8,
-                      height: MediaQuery.of(context).size.width * 0.8,
+                      width: 300.0,
+                      height: 300.0,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: MobileScanner(
                           controller: cameraController,
                           onDetect: (capture) async {
-                            if (!_isScanning) {
-                              return;
-                            }
                             final List<Barcode> barcodes = capture.barcodes;
                             for (final barcode in barcodes) {
                               if (barcode.rawValue != _previousBarcodeValue &&
                                   _isValidQRData(barcode.rawValue)) {
                                 Future.delayed(
-                                    const Duration(milliseconds: 500), () {
-                                  _toggleScan();
-                                });
+                                    const Duration(milliseconds: 500));
                                 friendData = jsonDecode(barcode.rawValue!);
                                 final String friendName = friendData['name'];
                                 scannedPubKey =
@@ -310,11 +276,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                           (globalKey) +
                                           '"}';
                                   await postToNostr(scannedPrivKey, jsonBody);
-                                } else {
-                                  setState(() {
-                                    qrResult =
-                                        '$friendName is already your friend!';
-                                  });
                                 }
                                 _previousBarcodeValue = barcode.rawValue;
                                 widget.onQRScanSuccess();
@@ -326,19 +287,16 @@ class _QRScannerPageState extends State<QRScannerPage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Visibility(
-                    visible: !_isScanning && _isLocationAvailable,
-                    child: Center(
-                      child: QrImage(
-                        data: jsonEncode({
-                          "name": _userName,
-                          "privateKey": _privateKey,
-                          "currentLocation": _currentLocationString
-                        }),
-                        version: QrVersions.auto,
-                        size: 300.0,
-                        gapless: false,
-                      ),
+                  Center(
+                    child: QrImage(
+                      data: jsonEncode({
+                        "name": _userName,
+                        "privateKey": _privateKey,
+                        "currentLocation": _currentLocationString
+                      }),
+                      version: QrVersions.auto,
+                      size: 300.0,
+                      gapless: false,
                     ),
                   ),
                   const SizedBox(height: 20),
