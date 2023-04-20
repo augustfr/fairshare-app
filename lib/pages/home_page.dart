@@ -96,6 +96,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       setState(() {
         myCurrentLocation = LatLng(latitude, longitude);
       });
+
+      await _lock.synchronized(() async {
+        await prefs.setDouble('current_latitude', latitude);
+        await prefs.setDouble('current_longitude', longitude);
+        oldLocation = myCurrentLocation;
+      });
     });
   }
 
