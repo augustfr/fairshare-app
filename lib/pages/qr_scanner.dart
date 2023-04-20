@@ -11,6 +11,7 @@ import '../utils/nostr.dart';
 import '../utils/friends.dart';
 import '../utils/location.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:path/path.dart' as path;
 
 Duration loopTime = const Duration(seconds: 10);
 
@@ -114,6 +115,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
       String globalKey = content['globalKey'];
       String? photoPath =
           await _promptForPhoto(friendName, _privateKey, CameraDevice.rear);
+      print(photoPath);
       Map<String, String> jsonMap = {
         "name": friendName,
         "privateKey": newFriendPrivKey,
@@ -150,28 +152,29 @@ class _QRScannerPageState extends State<QRScannerPage> {
     bool confirmTakePhoto = false;
 
     await showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Add Contact Photo'),
-            content: Text('Do you want to add a photo of $friendName?'),
-            actions: <Widget>[
-              TextButton(
-                child: const Text('No'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-              ),
-              TextButton(
-                child: const Text('Yes'),
-                onPressed: () {
-                  confirmTakePhoto = true;
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          );
-        });
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Add Contact Photo'),
+          content: Text('Do you want to add a photo of $friendName?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('No'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Yes'),
+              onPressed: () {
+                confirmTakePhoto = true;
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
 
     if (!confirmTakePhoto) {
       setState(() {
@@ -181,7 +184,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
     }
 
     final pickedFile = await picker.pickImage(
-        source: ImageSource.camera, preferredCameraDevice: cameraDevice);
+      source: ImageSource.camera,
+      preferredCameraDevice: cameraDevice,
+    );
 
     setState(() {
       qrResult = '$friendName has been added as a friend!';
@@ -193,8 +198,10 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
     final appDir = await getApplicationDocumentsDirectory();
     final fileName = '${friendName}_$friendKey.jpg';
-    final file = File('${appDir.path}/$fileName');
-    await pickedFile.saveTo(file.path);
+    final file = File(path.join(appDir.path, fileName));
+
+    final pickedFileBytes = await pickedFile.readAsBytes();
+    await file.writeAsBytes(pickedFileBytes);
 
     return file.path;
   }

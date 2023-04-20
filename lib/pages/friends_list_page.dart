@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:synchronized/synchronized.dart';
+import 'package:path/path.dart' as path;
 
 import './chat_page.dart';
 import './profile_page.dart';
@@ -103,7 +104,7 @@ class _FriendsListPageState extends State<FriendsListPage> {
   Future<void> _loadFriends() async {
     List<Map<String, dynamic>> updatedFriends =
         await Future.wait(await _updateFriendsList());
-
+    print(updatedFriends);
     _friendsStreamController.add(updatedFriends);
   }
 
@@ -197,23 +198,46 @@ class _FriendsListPageState extends State<FriendsListPage> {
       maxWidth: 800,
       maxHeight: 800,
     );
-
     if (pickedFile != null) {
-      List<Map<String, dynamic>> friendsList =
+      final List<Map<String, dynamic>> friendsList =
           await Future.wait(await _updateFriendsList());
       final Directory directory = await getApplicationDocumentsDirectory();
-      final String newPath =
-          '${directory.path}/${friendsList[index]['photoPath']}.png';
+      final String? existingPath = friendsList[index]['photoPath'] ?? '';
+      final String newFileName = path.basename(pickedFile.path);
+      final String newPath = '${directory.path}/$newFileName';
 
+      final File newFile = File(newPath);
+      final bool newFileExists = await newFile.exists();
+      if (newFileExists) {
+        // If the file already exists, delete it
+        await newFile.delete();
+      }
+
+      // Save the new photo
+      final pickedFileBytes = await pickedFile.readAsBytes();
+      await newFile.writeAsBytes(pickedFileBytes);
+
+      // Update the friends list
       friendsList[index]['photoPath'] = newPath;
-
-      await File(pickedFile.path).copy(newPath);
       _friendsStreamController.add(friendsList);
+
+      // Save the updated friends list to SharedPreferences
       await _lock.synchronized(() async {
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setStringList('friends',
-            friendsList.map((friend) => jsonEncode(friend)).toList());
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(
+          'friends',
+          friendsList.map((friend) => jsonEncode(friend)).toList(),
+        );
       });
+
+      // Delete the old photo if it exists and is not the same as the new photo
+      if (existingPath != newPath && existingPath != null) {
+        final File existingFile = File(existingPath);
+        final bool existingFileExists = await existingFile.exists();
+        if (existingFileExists) {
+          await existingFile.delete();
+        }
+      }
     }
   }
 
