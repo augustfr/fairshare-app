@@ -130,13 +130,14 @@ class _QRScannerPageState extends State<QRScannerPage> {
     const timeoutDuration = Duration(seconds: 5);
     const checkInterval = Duration(milliseconds: 100);
     Stopwatch stopwatch = Stopwatch()..start();
-    while (addingFriend.isEmpty) {
-      if (stopwatch.elapsed >= timeoutDuration) {
+    while (true) {
+      if (addingFriend.isNotEmpty) {
+        return await getPhotoandAddFriend();
+      } else if (stopwatch.elapsed >= timeoutDuration) {
         return false;
       }
       await Future.delayed(checkInterval);
     }
-    return await getPhotoandAddFriend();
   }
 
   Future<bool> getPhotoandAddFriend() async {

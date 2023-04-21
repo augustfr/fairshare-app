@@ -107,6 +107,9 @@ Future<void> connectWebSocket() async {
                 } else {
                   newFriendPrivKey = scannedPrivKey;
                 }
+                if (successfulPost) {
+                  addingFriend = content;
+                }
               } else if (content['globalKey'] != globalKey &&
                   content['type'] != 'handshake' &&
                   content['type'] != null &&
