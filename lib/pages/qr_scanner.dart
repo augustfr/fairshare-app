@@ -255,8 +255,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
                             for (final barcode in barcodes) {
                               if (barcode.rawValue != _previousBarcodeValue &&
                                   _isValidQRData(barcode.rawValue)) {
-                                Future.delayed(
-                                    const Duration(milliseconds: 250));
                                 friendData = jsonDecode(barcode.rawValue!);
                                 scannedPubKey =
                                     getPublicKey(friendData['privateKey']);
