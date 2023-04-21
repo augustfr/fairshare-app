@@ -23,6 +23,8 @@ String scannedPrivKey = '';
 
 bool isCameraStarted = false;
 
+bool successfullScan = false;
+
 class QRScannerPage extends StatefulWidget {
   final Function onQRScanSuccess;
 
@@ -53,13 +55,14 @@ class _QRScannerPageState extends State<QRScannerPage> {
   void initState() {
     super.initState();
     _startCamera();
+    successfullScan = false;
     _timer = Timer.periodic(loopTime, (timer) async {
       if (!addingFriendInProgress) {
         _updateKey();
       }
     });
     _timer2 = Timer.periodic(const Duration(milliseconds: 100), (timer) async {
-      if (successfulPost) {
+      if (successfulPost && !successfullScan) {
         await getPhotoandAddFriend();
       }
     });
@@ -127,20 +130,29 @@ class _QRScannerPageState extends State<QRScannerPage> {
   }
 
   Future<bool> _checkReceivedConfirm() async {
-    const timeoutDuration = Duration(seconds: 5);
+    const initialTimeoutDuration = Duration(seconds: 5);
     const checkInterval = Duration(milliseconds: 100);
     Stopwatch stopwatch = Stopwatch()..start();
-    while (true) {
+
+    bool shouldCallGetPhotoAndAddFriend = false;
+
+    while (stopwatch.elapsed < initialTimeoutDuration) {
       if (addingFriend.isNotEmpty) {
-        return await getPhotoandAddFriend();
-      } else if (stopwatch.elapsed >= timeoutDuration) {
-        return false;
+        shouldCallGetPhotoAndAddFriend = true;
+        break;
       }
       await Future.delayed(checkInterval);
     }
+
+    if (shouldCallGetPhotoAndAddFriend) {
+      await getPhotoandAddFriend();
+      return true;
+    }
+
+    return false;
   }
 
-  Future<bool> getPhotoandAddFriend() async {
+  Future<void> getPhotoandAddFriend() async {
     if (addingFriend.isNotEmpty) {
       addingFriendInProgress = true;
       Map<String, dynamic> content = addingFriend;
@@ -164,10 +176,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
           widget.onQRScanSuccess();
           addingFriendInProgress = false;
         }
-        return true;
       }
     }
-    return false;
   }
 
   bool _isValidQRData(String? rawData) {
@@ -313,6 +323,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                     if (barcode.rawValue !=
                                             _previousBarcodeValue &&
                                         _isValidQRData(barcode.rawValue)) {
+                                      successfullScan = true;
                                       friendData =
                                           jsonDecode(barcode.rawValue!);
                                       scannedPubKey = getPublicKey(
