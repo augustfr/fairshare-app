@@ -83,6 +83,9 @@ Future<void> connectWebSocket() async {
             if (content != null) {
               int? lastReceived = await getLatestReceivedEvent(pubKey);
               String globalKey = prefs.getString('global_key') ?? '';
+              // if (content['globalKey'] != globalKey) {
+              //   print(content);
+              // }
               int timestamp = getCreatedAt(event);
               int myLatestPost = prefs.getInt('my_latest_post_timestamp') ?? 0;
               if (globalKey == content['globalKey'] &&
@@ -188,7 +191,6 @@ Future<List<String>> addSubscription({required List<String> publicKeys}) async {
 }
 
 Future<void> closeSubscription({required List<String> subscriptionIds}) async {
-  print(subscriptionIds);
   assert(subscriptionIds.length == webSockets.length);
 
   for (int i = 0; i < subscriptionIds.length; i++) {

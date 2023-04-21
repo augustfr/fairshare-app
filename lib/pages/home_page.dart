@@ -139,9 +139,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         prefs.getStringList('friends_subscription_id');
     List<String> currentFriendsSubscriptions =
         friendsSubscriptionIds?.map((id) => id as String).toList() ?? [];
-
-    for (String subscriptionId in currentFriendsSubscriptions) {
-      await closeSubscription(subscriptionIds: [subscriptionId]);
+    if (currentFriendsSubscriptions.isNotEmpty) {
+      await closeSubscription(subscriptionIds: currentFriendsSubscriptions);
     }
 
     if (subscribedKeys.isNotEmpty) {
