@@ -124,6 +124,7 @@ Future<void> removeLatestReceivedEvent(String pubKey) async {
 Future<void> cleanSubscriptions() async {
   await _lock.synchronized(() async {
     SharedPreferences prefs = SharedPreferencesHelper().prefs;
+    await prefs.remove('friends_subscription_id');
     List<String> friendsList = prefs.getStringList('friends') ?? [];
     List<String> subscribedKeys = prefs.getStringList('subscribed_keys') ?? [];
     bool modified = false;

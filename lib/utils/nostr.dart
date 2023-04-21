@@ -15,9 +15,13 @@ import 'package:encrypt/encrypt.dart';
 import '../pages/qr_scanner.dart';
 import '../main.dart';
 
-String relay = 'wss://nostr.fairshare.social';
+List<String> relays = [
+  'wss://nostr.fairshare.social',
+  'wss://relay.damus.io',
+  'wss://relay.snort.social',
+];
 
-WebSocket? webSocket;
+List<WebSocket?> webSockets = List.filled(relays.length, null);
 Timer? timer;
 
 Map<String, dynamic> addingFriend = {};
@@ -34,153 +38,168 @@ String eventId = '';
 bool successfulPost = false;
 
 Future<void> connectWebSocket() async {
-  if (webSocket == null || webSocket!.readyState == WebSocket.closed) {
-    webSocket = await WebSocket.connect(relay);
-    print('Websocket connection made ' + relay);
-    SharedPreferences prefs = SharedPreferencesHelper().prefs;
-    webSocket!.listen((event) async {
-      if (event.contains('EVENT')) {
-        String currentEventId = getEventId(event);
-        if (currentEventId != eventId) {
-          eventId = currentEventId;
-          String pubKey = getPubkey(event);
-          String encryptedContent = getContent(event);
-          List<dynamic> friendsList = await loadFriends();
-          String? privateKey;
-          Map<String, dynamic>? content;
+  for (int i = 0; i < relays.length; i++) {
+    if (webSockets[i] == null ||
+        webSockets[i]!.readyState == WebSocket.closed) {
+      webSockets[i] = await WebSocket.connect(relays[i]);
+      print('Websocket connection made ' + relays[i]);
 
-          for (var friend in friendsList) {
-            dynamic decodedFriend = jsonDecode(friend);
-            if (getPublicKey(decodedFriend['privateKey']) == pubKey) {
-              privateKey = decodedFriend['privateKey'];
-              break;
-            }
-          }
-          if (privateKey == null) {
-            if (pubKey == prefs.getString('cycling_pub_key')) {
-              privateKey = prefs.getString('cycling_priv_key');
-            } else if (pubKey == scannedPubKey) {
-              privateKey = scannedPrivKey;
-            }
-          }
+      SharedPreferences prefs = SharedPreferencesHelper().prefs;
+      webSockets[i]!.listen((event) async {
+        if (event.contains('EVENT')) {
+          String currentEventId = getEventId(event);
+          if (currentEventId != eventId) {
+            eventId = currentEventId;
+            String pubKey = getPubkey(event);
+            String encryptedContent = getContent(event);
+            List<dynamic> friendsList = await loadFriends();
+            String? privateKey;
+            Map<String, dynamic>? content;
 
-          if (privateKey != null) {
-            try {
-              String decryptedContent = decrypt(privateKey, encryptedContent);
-              content = json.decode(decryptedContent);
-            } catch (e) {
-              content = json.decode(encryptedContent);
+            for (var friend in friendsList) {
+              dynamic decodedFriend = jsonDecode(friend);
+              if (getPublicKey(decodedFriend['privateKey']) == pubKey) {
+                privateKey = decodedFriend['privateKey'];
+                break;
+              }
             }
-          }
+            if (privateKey == null) {
+              if (pubKey == prefs.getString('cycling_pub_key')) {
+                privateKey = prefs.getString('cycling_priv_key');
+              } else if (pubKey == scannedPubKey) {
+                privateKey = scannedPrivKey;
+              }
+            }
 
-          if (content != null) {
-            int? lastReceived = await getLatestReceivedEvent(pubKey);
-            String globalKey = prefs.getString('global_key') ?? '';
-            int timestamp = getCreatedAt(event);
-            int myLatestPost = prefs.getInt('my_latest_post_timestamp') ?? 0;
-            if (globalKey == content['globalKey'] && timestamp > myLatestPost) {
-              prefs.setInt('my_latest_post_timestamp', timestamp);
-              successfulPost = true;
-              print('Successfully posted to Nostr: ');
-              print(content);
-            } else {
-              if (((pubKey == prefs.getString('cycling_pub_key')) ||
-                      pubKey == scannedPubKey) &&
-                  content['globalKey'] != globalKey &&
-                  (lastReceived == null || timestamp > lastReceived)) {
-                await setLatestReceivedEvent(timestamp, pubKey);
-                String? privateKey = prefs.getString('cycling_priv_key');
-                String? name = prefs.getString('user_name');
-                LatLng savedLocation = await getSavedLocation();
-                String currentLocationString = savedLocation.toString();
-                String jsonBody = '{"type": "handshake", "name": "' +
-                    (name ?? 'Anonymous') +
-                    '", "currentLocation": "' +
-                    currentLocationString +
-                    '", "globalKey": "' +
-                    (globalKey) +
-                    '"}';
-                if (privateKey != null && pubKey != scannedPubKey) {
-                  await postToNostr(privateKey, jsonBody);
-                  newFriendPrivKey = privateKey;
-                  addingFriend = content;
-                } else {
-                  newFriendPrivKey = scannedPrivKey;
-                }
-                if (successfulPost) {
-                  addingFriend = content;
-                }
-              } else if (content['globalKey'] != globalKey &&
-                  content['type'] != 'handshake' &&
-                  content['type'] != null &&
-                  content['globalKey'] != null) {
-                if (lastReceived == null || timestamp > lastReceived) {
-                  print('received new event from existing friend');
-                  if (content['type'] == 'locationUpdate') {
-                    int? latestLocationUpdate =
-                        await getLatestLocationUpdate(pubKey);
-                    latestLocationUpdate ??= 0;
-                    if (latestLocationUpdate < timestamp) {
-                      await updateFriendsLocation(content, pubKey);
-                      await setLatestLocationUpdate(timestamp, pubKey);
-                    }
-                    needsUpdate = true;
-                  } else if (content['type'] == 'message') {
-                    String text = content['message'];
-                    await addReceivedMessage(
-                        pubKey, content['globalKey'], text, timestamp);
-                    needsMessageUpdate = true;
-                    needsUpdate = true;
-                    needsChatListUpdate = true;
-                  }
+            if (privateKey != null) {
+              try {
+                String decryptedContent = decrypt(privateKey, encryptedContent);
+                content = json.decode(decryptedContent);
+              } catch (e) {
+                content = json.decode(encryptedContent);
+              }
+            }
+
+            if (content != null) {
+              int? lastReceived = await getLatestReceivedEvent(pubKey);
+              String globalKey = prefs.getString('global_key') ?? '';
+              int timestamp = getCreatedAt(event);
+              int myLatestPost = prefs.getInt('my_latest_post_timestamp') ?? 0;
+              if (globalKey == content['globalKey'] &&
+                  timestamp > myLatestPost) {
+                prefs.setInt('my_latest_post_timestamp', timestamp);
+                successfulPost = true;
+                print('Successfully posted to Nostr: ');
+                print(content);
+              } else {
+                if (((pubKey == prefs.getString('cycling_pub_key')) ||
+                        pubKey == scannedPubKey) &&
+                    content['globalKey'] != globalKey &&
+                    (lastReceived == null || timestamp > lastReceived)) {
                   await setLatestReceivedEvent(timestamp, pubKey);
+                  String? privateKey = prefs.getString('cycling_priv_key');
+                  String? name = prefs.getString('user_name');
+                  LatLng savedLocation = await getSavedLocation();
+                  String currentLocationString = savedLocation.toString();
+                  String jsonBody = '{"type": "handshake", "name": "' +
+                      (name ?? 'Anonymous') +
+                      '", "currentLocation": "' +
+                      currentLocationString +
+                      '", "globalKey": "' +
+                      (globalKey) +
+                      '"}';
+                  if (privateKey != null && pubKey != scannedPubKey) {
+                    await postToNostr(privateKey, jsonBody);
+                    newFriendPrivKey = privateKey;
+                    addingFriend = content;
+                  } else {
+                    newFriendPrivKey = scannedPrivKey;
+                  }
+                  if (successfulPost) {
+                    addingFriend = content;
+                  }
+                } else if (content['globalKey'] != globalKey &&
+                    content['type'] != 'handshake' &&
+                    content['type'] != null &&
+                    content['globalKey'] != null) {
+                  if (lastReceived == null || timestamp > lastReceived) {
+                    print('received new event from existing friend');
+                    if (content['type'] == 'locationUpdate') {
+                      int? latestLocationUpdate =
+                          await getLatestLocationUpdate(pubKey);
+                      latestLocationUpdate ??= 0;
+                      if (latestLocationUpdate < timestamp) {
+                        await updateFriendsLocation(content, pubKey);
+                        await setLatestLocationUpdate(timestamp, pubKey);
+                      }
+                      needsUpdate = true;
+                    } else if (content['type'] == 'message') {
+                      String text = content['message'];
+                      await addReceivedMessage(
+                          pubKey, content['globalKey'], text, timestamp);
+                      needsMessageUpdate = true;
+                      needsUpdate = true;
+                      needsChatListUpdate = true;
+                    }
+                    await setLatestReceivedEvent(timestamp, pubKey);
+                  }
                 }
               }
             }
           }
         }
-      }
-    });
+      });
+    }
   }
 }
 
 Future<void> closeWebSocket() async {
-  await webSocket!.close();
-  webSocket = null;
+  for (WebSocket? ws in webSockets) {
+    if (ws != null) {
+      await ws.close();
+    }
+  }
+  webSockets = List.filled(relays.length, null);
 }
 
-Future<String> addSubscription({required List<String> publicKeys}) async {
-  String subscriptionId = generate64RandomHexChars();
-  Request requestWithFilter = Request(subscriptionId, [
-    Filter(
-      authors: publicKeys,
-      kinds: [1],
-      since: 0,
-      limit: 450,
-    )
-  ]);
+Future<List<String>> addSubscription({required List<String> publicKeys}) async {
+  List<String> subscriptionIds = [];
+  for (int i = 0; i < relays.length; i++) {
+    String subscriptionId = generate64RandomHexChars();
+    Request requestWithFilter = Request(subscriptionId, [
+      Filter(
+        authors: publicKeys,
+        kinds: [1],
+        since: 0,
+        limit: 450,
+      )
+    ]);
 
-  if (webSocket == null) {
-    print('reconnecting websocket');
-    await connectWebSocket();
+    if (webSockets[i] == null) {
+      print('reconnecting websocket');
+      await connectWebSocket();
+    }
+
+    webSockets[i]!.add(requestWithFilter.serialize());
+    print('added subscription (id: ' + subscriptionId + '):');
+    subscriptionIds.add(subscriptionId);
   }
 
-  webSocket!.add(requestWithFilter.serialize());
-  print('added subscription (id: ' + subscriptionId + '):');
-
-  return subscriptionId;
+  return subscriptionIds;
 }
 
-Future<void> closeSubscription({required String subscriptionId}) async {
-  var close = Close(subscriptionId);
+Future<void> closeSubscription({required List<String> subscriptionIds}) async {
+  for (int i = 0; i < relays.length; i++) {
+    var close = Close(subscriptionIds[i]);
 
-  if (webSocket == null) {
-    print('reconnecting websocket');
-    await connectWebSocket();
+    if (webSockets[i] == null) {
+      print('reconnecting websocket');
+      await connectWebSocket();
+    }
+
+    webSockets[i]!.add(close.serialize());
+    print('closed subscription (id: ' + subscriptionIds[i] + ')');
   }
-
-  webSocket!.add(close.serialize());
-  print('closed subscription (id: ' + subscriptionId + ')');
 }
 
 String getPubkey(String input) {
@@ -242,11 +261,14 @@ Future<void> postToNostr(String privateKey, String content) async {
   Event eventToSend = Event.from(
       kind: 1, tags: [], content: encryptedContent, privkey: privateKey);
 
-  if (webSocket == null) {
-    print('reconnected websocket');
-    await connectWebSocket();
+  // Iterate through the webSockets list and send the event to each connected WebSocket
+  for (int i = 0; i < webSockets.length; i++) {
+    if (webSockets[i] == null) {
+      print('reconnected websocket');
+      await connectWebSocket();
+    }
+    webSockets[i]!.add(eventToSend.serialize());
   }
-  webSocket!.add(eventToSend.serialize());
 }
 
 String encrypt(String privateKey, String content) {

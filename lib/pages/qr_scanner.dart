@@ -44,7 +44,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
   String _privateKey = '';
   String _currentLocationString = ''; // declare as state variable
   String currentLocationString = '';
-  String _previousId = '';
+  List<String> _previousIds = [];
+  List<String> _currentIds = [];
   bool addingFriendInProgress = false;
   bool _isLoading = false;
 
@@ -71,8 +72,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   @override
   void dispose() {
-    if (_previousId != '') {
-      closeSubscription(subscriptionId: _previousId);
+    if (_previousIds.isNotEmpty) {
+      closeSubscription(subscriptionIds: _previousIds);
     }
     _timer.cancel();
     _timer2.cancel();
@@ -111,20 +112,23 @@ class _QRScannerPageState extends State<QRScannerPage> {
     SharedPreferences prefs = SharedPreferencesHelper().prefs;
     String privateKey = generateRandomPrivateKey();
     String pubKey = getPublicKey(privateKey);
-    String id = await addSubscription(publicKeys: [pubKey]);
+    List<String> ids = await addSubscription(publicKeys: [pubKey]);
 
     setState(() {
-      _previousId = id;
+      _previousIds = _currentIds;
+      _currentIds = ids;
       _privateKey = privateKey;
       _currentLocationString = currentLocationString;
     });
 
-    String? previousId = prefs.getString('cycling_subscription_id');
+    List<String> previousIds =
+        prefs.getStringList('cycling_subscription_ids') ?? [];
 
-    if (previousId != null) {
-      await closeSubscription(subscriptionId: previousId);
+    for (String previousId in previousIds) {
+      await closeSubscription(subscriptionIds: [previousId]);
     }
-    await prefs.setString('cycling_subscription_id', id);
+
+    await prefs.setStringList('cycling_subscription_ids', ids);
     await prefs.setString('cycling_pub_key', pubKey);
     await prefs.setString('cycling_priv_key', privateKey);
   }

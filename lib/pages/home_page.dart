@@ -135,14 +135,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _fetchAndUpdateData() async {
     SharedPreferences prefs = SharedPreferencesHelper().prefs;
     List<String> subscribedKeys = prefs.getStringList('subscribed_keys') ?? [];
-    String? currentFriendsSubscription =
-        prefs.getString('friends_subscription_id');
-    if (currentFriendsSubscription != null) {
-      await closeSubscription(subscriptionId: (currentFriendsSubscription));
+    List<dynamic>? friendsSubscriptionIds =
+        prefs.getStringList('friends_subscription_id');
+    List<String> currentFriendsSubscriptions =
+        friendsSubscriptionIds?.map((id) => id as String).toList() ?? [];
+
+    for (String subscriptionId in currentFriendsSubscriptions) {
+      await closeSubscription(subscriptionIds: [subscriptionId]);
     }
+
     if (subscribedKeys.isNotEmpty) {
-      String id = await addSubscription(publicKeys: subscribedKeys);
-      await prefs.setString('friends_subscription_id', id);
+      List<String> ids = await addSubscription(publicKeys: subscribedKeys);
+      await prefs.setStringList('friends_subscription_id', ids);
     }
   }
 
