@@ -44,7 +44,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
   String _privateKey = '';
   String _currentLocationString = ''; // declare as state variable
   String currentLocationString = '';
-  bool _isLocationAvailable = false;
   String _previousId = '';
   bool addingFriendInProgress = false;
   bool _isLoading = false;
@@ -95,7 +94,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
     LatLng savedLocation = await getSavedLocation();
     currentLocationString = savedLocation.toString();
     setState(() {
-      _isLocationAvailable = true;
       _userName = prefs.getString('user_name') ?? '';
     });
     await _updateKey();
@@ -105,28 +103,28 @@ class _QRScannerPageState extends State<QRScannerPage> {
     SharedPreferences prefs = SharedPreferencesHelper().prefs;
     String privateKey = generateRandomPrivateKey();
     String pubKey = getPublicKey(privateKey);
-    String? previousId = prefs.getString('cycling_subscription_id');
-    if (previousId != null) {
-      await closeSubscription(subscriptionId: previousId);
-    }
     String id = await addSubscription(publicKeys: [pubKey]);
-    await prefs.setString('cycling_subscription_id', id);
-    await prefs.setString('cycling_pub_key', pubKey);
-    await prefs.setString('cycling_priv_key', privateKey);
 
     setState(() {
       _previousId = id;
       _privateKey = privateKey;
       _currentLocationString = currentLocationString;
     });
+
+    String? previousId = prefs.getString('cycling_subscription_id');
+
+    if (previousId != null) {
+      await closeSubscription(subscriptionId: previousId);
+    }
+    await prefs.setString('cycling_subscription_id', id);
+    await prefs.setString('cycling_pub_key', pubKey);
+    await prefs.setString('cycling_priv_key', privateKey);
   }
 
   Future<bool> _checkReceivedConfirm() async {
     const timeoutDuration = Duration(seconds: 5);
     const checkInterval = Duration(milliseconds: 100);
-
     Stopwatch stopwatch = Stopwatch()..start();
-
     while (addingFriend.isEmpty) {
       if (stopwatch.elapsed >= timeoutDuration) {
         return false;
@@ -170,8 +168,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
     try {
       final Map<String, dynamic> decodedData = jsonDecode(rawData);
-      return decodedData.containsKey('name') &&
-          decodedData.containsKey('privateKey');
+      return decodedData.containsKey('privateKey');
     } catch (e) {
       return false;
     }
@@ -220,7 +217,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
     if (!confirmTakePhoto) {
       _showPopup(context, '$friendName added successfully');
-      print('pop');
       Navigator.of(context).pop();
       return null;
     }
@@ -229,9 +225,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
       source: ImageSource.camera,
       preferredCameraDevice: cameraDevice,
     );
-    print('test');
     if (pickedFile == null) {
-      print('failed to add');
       _showPopup(context, 'Failed to add friend');
       Navigator.of(context).pop();
       return null;
@@ -336,6 +330,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                                 '", "globalKey": "' +
                                                 (globalKey) +
                                                 '"}';
+                                        print('posting');
                                         await postToNostr(
                                             scannedPrivKey, jsonBody);
                                         bool received =
@@ -360,11 +355,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                         Center(
                           child: QrImage(
                             data: jsonEncode({
-                              "name": _userName,
                               "privateKey": _privateKey,
-                              "currentLocation": _isLocationAvailable
-                                  ? _currentLocationString
-                                  : 'LatLng(0.0,0.0)'
                             }),
                             version: QrVersions.auto,
                             size: 200.0,
