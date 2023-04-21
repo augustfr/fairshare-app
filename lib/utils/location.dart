@@ -5,11 +5,12 @@ import 'dart:math';
 import 'dart:convert';
 import './nostr.dart';
 import 'package:synchronized/synchronized.dart';
+import '../main.dart';
 
 final _lock = Lock();
 
 Future<LatLng> getSavedLocation() async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
   double latitude = prefs.getDouble('current_latitude') ?? 0.0;
   double longitude = prefs.getDouble('current_longitude') ?? 0.0;
   return LatLng(latitude, longitude);
@@ -27,7 +28,7 @@ Future<void> updateFriendsLocation(
     Map<String, dynamic> content, String pubKey) async {
   String? globalKey = content['globalKey'];
   if (globalKey != null) {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
     await _lock.synchronized(() async {
       List<String> friendsList = prefs.getStringList('friends') ?? [];
       bool isUpdated = false;

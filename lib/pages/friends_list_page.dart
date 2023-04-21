@@ -16,6 +16,7 @@ import '../utils/friends.dart';
 import '../utils/location.dart';
 import '../utils/nostr.dart';
 import './home_page.dart';
+import '../main.dart';
 
 final _lock = Lock();
 
@@ -222,7 +223,7 @@ class _FriendsListPageState extends State<FriendsListPage> {
 
       // Save the updated friends list to SharedPreferences
       await _lock.synchronized(() async {
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        final SharedPreferences prefs = SharedPreferencesHelper().prefs;
         await prefs.setStringList(
           'friends',
           friendsList.map((friend) => jsonEncode(friend)).toList(),
@@ -247,7 +248,7 @@ class _FriendsListPageState extends State<FriendsListPage> {
     _friendsStreamController.add(friendsList);
 
     await _lock.synchronized(() async {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
+      SharedPreferences prefs = SharedPreferencesHelper().prefs;
       await prefs.setStringList(
           'friends', friendsList.map((friend) => jsonEncode(friend)).toList());
     });

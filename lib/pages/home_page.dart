@@ -14,6 +14,7 @@ import './qr_scanner.dart';
 import '../utils/nostr.dart';
 import '../utils/friends.dart';
 import '../utils/location.dart';
+import '../main.dart';
 
 final _lock = Lock();
 
@@ -56,14 +57,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _loadSwitchValue() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
+
     setState(() {
       switchValue = prefs.getBool('switchValue') ?? true;
     });
   }
 
   void _saveSwitchValue(bool value) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
+
     await prefs.setBool('switchValue', value);
     if (value) {
       await sendLocationUpdate();
@@ -72,7 +75,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   void _subscribeToLocationUpdates() async {
     final location = Location();
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
+
     double latitude;
     double longitude;
     LatLng oldLocation = const LatLng(0, 0);
@@ -108,7 +112,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> sendLocationUpdate() async {
     friendsList = await loadFriends();
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
+
     String globalKey = prefs.getString('global_key') ?? '';
     List<double> currentLocationString =
         parseLatLngFromString(myCurrentLocation.toString());
@@ -128,7 +133,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _fetchAndUpdateData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
     List<String> subscribedKeys = prefs.getStringList('subscribed_keys') ?? [];
     String? currentFriendsSubscription =
         prefs.getString('friends_subscription_id');
@@ -188,7 +193,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final latLng = await getCurrentLocation();
 
     // Save current location in SharedPreferences
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
+
     await prefs.setDouble('current_latitude', latLng.latitude);
     await prefs.setDouble('current_longitude', latLng.longitude);
 
@@ -196,7 +202,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _checkFirstTimeUser() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
+
     bool isFirstTime = prefs.getBool('first_time') ?? true;
 
     if (isFirstTime) {
@@ -449,7 +456,8 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
   Future<void> _saveUserDetails() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      SharedPreferences prefs = await SharedPreferences.getInstance();
+      SharedPreferences prefs = SharedPreferencesHelper().prefs;
+
       prefs.setString('user_name', _userName);
       prefs.setString('global_key', generateRandomPrivateKey());
       Navigator.of(context).pop();

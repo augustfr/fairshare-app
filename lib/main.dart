@@ -1,7 +1,26 @@
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+class SharedPreferencesHelper {
+  static final SharedPreferencesHelper _instance =
+      SharedPreferencesHelper._internal();
+  late SharedPreferences prefs;
+
+  factory SharedPreferencesHelper() {
+    return _instance;
+  }
+
+  SharedPreferencesHelper._internal();
+
+  Future<void> init() async {
+    prefs = await SharedPreferences.getInstance();
+  }
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SharedPreferencesHelper().init();
   runApp(const MyApp());
 }
 

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/nostr.dart';
 import '../utils/friends.dart';
 import '../pages/home_page.dart';
+import '../main.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -24,7 +25,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadUserDetails() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
     String? name = prefs.getString('user_name');
     String? globalKey = prefs.getString('global_key');
 
@@ -35,7 +36,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _resetAndCloseApp() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
 
     showDialog(
       context: context,
@@ -130,7 +131,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             TextButton(
               onPressed: () async {
-                SharedPreferences prefs = await SharedPreferences.getInstance();
+                SharedPreferences prefs = SharedPreferencesHelper().prefs;
                 prefs.setString('user_name', newName);
                 setState(() {
                   _name = newName;

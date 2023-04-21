@@ -7,11 +7,12 @@ import 'package:flutter_vibrate/flutter_vibrate.dart';
 import '../utils/nostr.dart';
 import 'package:synchronized/synchronized.dart';
 import './messages.dart';
+import '../main.dart';
 
 final _lock = Lock();
 
 Future<List<String>> loadFriends() async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
   List<String> friendsList = [];
 
   friendsList = prefs.getStringList('friends') ?? [];
@@ -22,7 +23,7 @@ Future<List<String>> loadFriends() async {
 Future<bool> addFriend(String rawData, String? photoPath) async {
   final Map<String, dynamic> friendData = jsonDecode(rawData);
 
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
   String? privateKey;
 
   if (friendData['privateKey'] == null) {
@@ -69,7 +70,7 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
 
 Future<void> setLatestReceivedEvent(int createdAt, String pubKey) async {
   await _lock.synchronized(() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
     String? jsonString = prefs.getString('latestEventTimestamps');
     if (jsonString != null) {
       latestEventTimestamps = json.decode(jsonString) as Map<String, dynamic>;
@@ -81,7 +82,7 @@ Future<void> setLatestReceivedEvent(int createdAt, String pubKey) async {
 }
 
 Future<void> setLatestLocationUpdate(int createdAt, String pubKey) async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
   String? jsonString = prefs.getString('latestLocationTimestamps');
   if (jsonString != null) {
     latestEventTimestamps = json.decode(jsonString) as Map<String, dynamic>;
@@ -92,7 +93,7 @@ Future<void> setLatestLocationUpdate(int createdAt, String pubKey) async {
 }
 
 Future<int?> getLatestLocationUpdate(String pubKey) async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
   String? jsonString = prefs.getString('latestLocationTimestamps');
   if (jsonString != null) {
     latestEventTimestamps = json.decode(jsonString) as Map<String, dynamic>;
@@ -101,7 +102,7 @@ Future<int?> getLatestLocationUpdate(String pubKey) async {
 }
 
 Future<int?> getLatestReceivedEvent(String pubKey) async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
   String? jsonString = prefs.getString('latestEventTimestamps');
   if (jsonString != null) {
     latestEventTimestamps = json.decode(jsonString) as Map<String, dynamic>;
@@ -110,7 +111,7 @@ Future<int?> getLatestReceivedEvent(String pubKey) async {
 }
 
 Future<void> removeLatestReceivedEvent(String pubKey) async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
   String? jsonString = prefs.getString('latestEventTimestamps');
   if (jsonString != null) {
     latestEventTimestamps = json.decode(jsonString) as Map<String, dynamic>;
@@ -122,7 +123,7 @@ Future<void> removeLatestReceivedEvent(String pubKey) async {
 
 Future<void> cleanSubscriptions() async {
   await _lock.synchronized(() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
     List<String> friendsList = prefs.getStringList('friends') ?? [];
     List<String> subscribedKeys = prefs.getStringList('subscribed_keys') ?? [];
     bool modified = false;
@@ -148,7 +149,7 @@ Future<void> cleanSubscriptions() async {
 
 Future<void> removeFriend(int index) async {
   await _lock.synchronized(() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
     List<String> friendsList = prefs.getStringList('friends') ?? [];
     List<String> subscribedKeys = prefs.getStringList('subscribed_keys') ?? [];
     String pubKey = getPublicKey(jsonDecode(friendsList[index])['privateKey']);
@@ -168,7 +169,7 @@ Future<void> removeFriend(int index) async {
 }
 
 Future<void> removeAllFriends() async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
   await _lock.synchronized(() async {
     await prefs.remove('subscribed_keys');
     await prefs.remove('friends');
@@ -179,7 +180,7 @@ Future<void> removeAllFriends() async {
 }
 
 Future<List<int>> checkForUnreadMessages(friendsList) async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
 
   List<int> friendsWithUnreadMessages = [];
   for (int i = 0; i < friendsList.length; i++) {

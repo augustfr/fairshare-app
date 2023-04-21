@@ -13,6 +13,7 @@ import '../pages/friends_list_page.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:encrypt/encrypt.dart';
 import '../pages/qr_scanner.dart';
+import '../main.dart';
 
 String relay = 'wss://nostr.fairshare.social';
 
@@ -36,7 +37,7 @@ Future<void> connectWebSocket() async {
   if (webSocket == null || webSocket!.readyState == WebSocket.closed) {
     webSocket = await WebSocket.connect(relay);
     print('Websocket connection made ' + relay);
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
     webSocket!.listen((event) async {
       if (event.contains('EVENT')) {
         String currentEventId = getEventId(event);
@@ -105,7 +106,7 @@ Future<void> connectWebSocket() async {
                 } else {
                   newFriendPrivKey = scannedPrivKey;
                 }
-                if (privateKey != null) {
+                if (privateKey != null && successfulPost) {
                   addingFriend = content;
                 }
               } else if (content['globalKey'] != globalKey &&

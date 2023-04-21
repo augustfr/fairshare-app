@@ -12,6 +12,7 @@ import '../utils/friends.dart';
 import '../utils/location.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:path/path.dart' as path;
+import '../main.dart';
 
 Duration loopTime = const Duration(seconds: 10);
 
@@ -19,6 +20,8 @@ Map<String, dynamic> friendData = {};
 
 String scannedPubKey = '';
 String scannedPrivKey = '';
+
+bool isCameraStarted = false;
 
 class QRScannerPage extends StatefulWidget {
   final Function onQRScanSuccess;
@@ -33,8 +36,9 @@ class QRScannerPage extends StatefulWidget {
 }
 
 class _QRScannerPageState extends State<QRScannerPage> {
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
   late MobileScannerController cameraController;
-  String qrResult = '';
   String? _previousBarcodeValue;
   String _userName = '';
   String _privateKey = '';
@@ -43,22 +47,18 @@ class _QRScannerPageState extends State<QRScannerPage> {
   bool _isLocationAvailable = false;
   String _previousId = '';
   bool addingFriendInProgress = false;
+  bool _isLoading = false;
 
   late Timer _timer;
-  late Timer _timer2;
 
   @override
   void initState() {
     super.initState();
-    cameraController = MobileScannerController();
-    cameraController.start(); // Start the camera when the page is initialized
+    _startCamera();
     _timer = Timer.periodic(loopTime, (timer) async {
       if (!addingFriendInProgress) {
         _updateKey();
       }
-    });
-    _timer2 = Timer.periodic(const Duration(milliseconds: 200), (timer) async {
-      _checkReceivedConfirm();
     });
     _loadUserData();
   }
@@ -69,13 +69,29 @@ class _QRScannerPageState extends State<QRScannerPage> {
       closeSubscription(subscriptionId: _previousId);
     }
     _timer.cancel();
-    _timer2.cancel();
-    cameraController.dispose();
+    _stopCamera();
     super.dispose();
   }
 
+  void _startCamera() {
+    if (!isCameraStarted) {
+      cameraController = MobileScannerController();
+      cameraController.start().then((_) {
+        isCameraStarted = true;
+      });
+    }
+  }
+
+  void _stopCamera() {
+    if (isCameraStarted) {
+      cameraController.stop().then((_) {
+        isCameraStarted = false;
+      });
+    }
+  }
+
   Future<void> _loadUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
     LatLng savedLocation = await getSavedLocation();
     currentLocationString = savedLocation.toString();
     setState(() {
@@ -86,7 +102,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
   }
 
   Future<void> _updateKey() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
     String privateKey = generateRandomPrivateKey();
     String pubKey = getPublicKey(privateKey);
     String? previousId = prefs.getString('cycling_subscription_id');
@@ -105,30 +121,46 @@ class _QRScannerPageState extends State<QRScannerPage> {
     });
   }
 
-  Future<void> _checkReceivedConfirm() async {
+  Future<bool> _checkReceivedConfirm() async {
+    const timeoutDuration = Duration(seconds: 5);
+    const checkInterval = Duration(milliseconds: 100);
+
+    Stopwatch stopwatch = Stopwatch()..start();
+
+    while (addingFriend.isEmpty) {
+      if (stopwatch.elapsed >= timeoutDuration) {
+        return false;
+      }
+      await Future.delayed(checkInterval);
+    }
+
     if (addingFriend.isNotEmpty) {
       addingFriendInProgress = true;
       Map<String, dynamic> content = addingFriend;
       addingFriend = {};
-      String friendName = content['name'];
-      String friendLocation = content['currentLocation'];
-      String globalKey = content['globalKey'];
-      String? photoPath =
-          await _promptForPhoto(friendName, _privateKey, CameraDevice.rear);
-      Map<String, String> jsonMap = {
-        "name": friendName,
-        "privateKey": newFriendPrivKey,
-        "currentLocation": friendLocation,
-        "globalKey": globalKey
-      };
-      String jsonString = json.encode(jsonMap);
-      bool added = await addFriend(jsonString, photoPath);
+      if (content['name'] != null) {
+        String friendName = content['name'];
+        String friendLocation = content['currentLocation'];
+        String globalKey = content['globalKey'];
+        String? photoPath =
+            await _promptForPhoto(friendName, _privateKey, CameraDevice.rear);
+        Map<String, String> jsonMap = {
+          "name": friendName,
+          "privateKey": newFriendPrivKey,
+          "currentLocation": friendLocation,
+          "globalKey": globalKey
+        };
+        String jsonString = json.encode(jsonMap);
+        bool added = await addFriend(jsonString, photoPath);
 
-      if (added) {
-        widget.onQRScanSuccess();
-        addingFriendInProgress = false;
+        if (added) {
+          widget.onQRScanSuccess();
+          addingFriendInProgress = false;
+        }
+        return true;
       }
     }
+    return false;
   }
 
   bool _isValidQRData(String? rawData) {
@@ -143,6 +175,17 @@ class _QRScannerPageState extends State<QRScannerPage> {
     } catch (e) {
       return false;
     }
+  }
+
+  void _showPopup(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.fromLTRB(15, 15, 15, 0),
+      ),
+    );
   }
 
   Future<String?> _promptForPhoto(
@@ -176,9 +219,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
     );
 
     if (!confirmTakePhoto) {
-      setState(() {
-        qrResult = '$friendName has been added as a friend!';
-      });
+      _showPopup(context, '$friendName added successfully');
+      print('pop');
+      Navigator.of(context).pop();
       return null;
     }
 
@@ -186,12 +229,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
       source: ImageSource.camera,
       preferredCameraDevice: cameraDevice,
     );
-
-    setState(() {
-      qrResult = '$friendName has been added as a friend!';
-    });
-
+    print('test');
     if (pickedFile == null) {
+      print('failed to add');
+      _showPopup(context, 'Failed to add friend');
+      Navigator.of(context).pop();
       return null;
     }
 
@@ -202,12 +244,15 @@ class _QRScannerPageState extends State<QRScannerPage> {
     final pickedFileBytes = await pickedFile.readAsBytes();
     await file.writeAsBytes(pickedFileBytes);
 
+    _showPopup(context, '$friendName added successfully');
+    Navigator.of(context).pop();
+
     return file.path;
   }
 
   Future<bool> _isFriendAlreadyAdded(String rawData) async {
     final Map<String, dynamic> friendData = jsonDecode(rawData);
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
 
     List<String> friendsList = prefs.getStringList('friends') ?? [];
 
@@ -238,81 +283,96 @@ class _QRScannerPageState extends State<QRScannerPage> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 50, 10, 10),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: SizedBox(
-                      width: 200.0,
-                      height: 200.0,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: MobileScanner(
-                          controller: cameraController,
-                          onDetect: (capture) async {
-                            final List<Barcode> barcodes = capture.barcodes;
-                            for (final barcode in barcodes) {
-                              if (barcode.rawValue != _previousBarcodeValue &&
-                                  _isValidQRData(barcode.rawValue)) {
-                                friendData = jsonDecode(barcode.rawValue!);
-                                scannedPubKey =
-                                    getPublicKey(friendData['privateKey']);
-                                scannedPrivKey = friendData['privateKey'];
-                                await addSubscription(
-                                    publicKeys: [scannedPubKey]);
-                                bool isAlreadyAdded =
-                                    await _isFriendAlreadyAdded(
-                                        barcode.rawValue!);
-                                SharedPreferences prefs =
-                                    await SharedPreferences.getInstance();
-                                String? name = prefs.getString('user_name');
-                                String? globalKey =
-                                    prefs.getString('global_key');
-                                if (!isAlreadyAdded && globalKey != null) {
-                                  String jsonBody =
-                                      '{"type": "handshake", "name": "' +
-                                          (name ?? 'Anonymous') +
-                                          '", "currentLocation": "' +
-                                          _currentLocationString +
-                                          '", "globalKey": "' +
-                                          (globalKey) +
-                                          '"}';
-                                  await postToNostr(scannedPrivKey, jsonBody);
-                                }
-                                _previousBarcodeValue = barcode.rawValue;
-                                widget.onQRScanSuccess();
-                              }
-                            }
-                          },
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(),
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: SizedBox(
+                            width: 200.0,
+                            height: 200.0,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: MobileScanner(
+                                controller: cameraController,
+                                onDetect: (capture) async {
+                                  setState(() {
+                                    _isLoading = true;
+                                    _stopCamera();
+                                  });
+                                  final List<Barcode> barcodes =
+                                      capture.barcodes;
+                                  for (final barcode in barcodes) {
+                                    if (barcode.rawValue !=
+                                            _previousBarcodeValue &&
+                                        _isValidQRData(barcode.rawValue)) {
+                                      friendData =
+                                          jsonDecode(barcode.rawValue!);
+                                      scannedPubKey = getPublicKey(
+                                          friendData['privateKey']);
+                                      scannedPrivKey = friendData['privateKey'];
+                                      await addSubscription(
+                                          publicKeys: [scannedPubKey]);
+                                      bool isAlreadyAdded =
+                                          await _isFriendAlreadyAdded(
+                                              barcode.rawValue!);
+                                      SharedPreferences prefs =
+                                          await SharedPreferences.getInstance();
+                                      String? name =
+                                          prefs.getString('user_name');
+                                      String? globalKey =
+                                          prefs.getString('global_key');
+                                      if (!isAlreadyAdded &&
+                                          globalKey != null) {
+                                        String jsonBody =
+                                            '{"type": "handshake", "name": "' +
+                                                (name ?? 'Anonymous') +
+                                                '", "currentLocation": "' +
+                                                _currentLocationString +
+                                                '", "globalKey": "' +
+                                                (globalKey) +
+                                                '"}';
+                                        await postToNostr(
+                                            scannedPrivKey, jsonBody);
+                                        bool received =
+                                            await _checkReceivedConfirm();
+                                        if (!received) {
+                                          _showPopup(
+                                              context, 'Failed to add friend');
+                                          Navigator.of(context).pop();
+                                        } else {
+                                          widget.onQRScanSuccess();
+                                        }
+                                      }
+                                      _previousBarcodeValue = barcode.rawValue;
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 20),
+                        Center(
+                          child: QrImage(
+                            data: jsonEncode({
+                              "name": _userName,
+                              "privateKey": _privateKey,
+                              "currentLocation": _isLocationAvailable
+                                  ? _currentLocationString
+                                  : 'LatLng(0.0,0.0)'
+                            }),
+                            version: QrVersions.auto,
+                            size: 200.0,
+                            gapless: false,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  Center(
-                    child: QrImage(
-                      data: jsonEncode({
-                        "name": _userName,
-                        "privateKey": _privateKey,
-                        "currentLocation": _currentLocationString
-                      }),
-                      version: QrVersions.auto,
-                      size: 200.0,
-                      gapless: false,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    qrResult,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
