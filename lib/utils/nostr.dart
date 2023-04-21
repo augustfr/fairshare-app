@@ -184,12 +184,14 @@ Future<List<String>> addSubscription({required List<String> publicKeys}) async {
     print('added subscription (id: ' + subscriptionId + '):');
     subscriptionIds.add(subscriptionId);
   }
-
   return subscriptionIds;
 }
 
 Future<void> closeSubscription({required List<String> subscriptionIds}) async {
-  for (int i = 0; i < relays.length; i++) {
+  print(subscriptionIds);
+  assert(subscriptionIds.length == webSockets.length);
+
+  for (int i = 0; i < subscriptionIds.length; i++) {
     var close = Close(subscriptionIds[i]);
 
     if (webSockets[i] == null) {

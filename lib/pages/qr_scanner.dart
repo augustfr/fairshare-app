@@ -124,9 +124,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
     List<String> previousIds =
         prefs.getStringList('cycling_subscription_ids') ?? [];
 
-    for (String previousId in previousIds) {
-      await closeSubscription(subscriptionIds: [previousId]);
-    }
+    await closeSubscription(subscriptionIds: previousIds);
 
     await prefs.setStringList('cycling_subscription_ids', ids);
     await prefs.setString('cycling_pub_key', pubKey);
