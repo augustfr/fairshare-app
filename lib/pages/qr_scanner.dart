@@ -244,8 +244,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
                 children: [
                   Center(
                     child: SizedBox(
-                      width: 300.0,
-                      height: 300.0,
+                      width: 200.0,
+                      height: 200.0,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: MobileScanner(
@@ -256,9 +256,8 @@ class _QRScannerPageState extends State<QRScannerPage> {
                               if (barcode.rawValue != _previousBarcodeValue &&
                                   _isValidQRData(barcode.rawValue)) {
                                 Future.delayed(
-                                    const Duration(milliseconds: 500));
+                                    const Duration(milliseconds: 250));
                                 friendData = jsonDecode(barcode.rawValue!);
-                                final String friendName = friendData['name'];
                                 scannedPubKey =
                                     getPublicKey(friendData['privateKey']);
                                 scannedPrivKey = friendData['privateKey'];
@@ -301,7 +300,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                         "currentLocation": _currentLocationString
                       }),
                       version: QrVersions.auto,
-                      size: 300.0,
+                      size: 200.0,
                       gapless: false,
                     ),
                   ),
