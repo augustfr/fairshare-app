@@ -103,11 +103,9 @@ Future<void> connectWebSocket() async {
                 if (privateKey != null && pubKey != scannedPubKey) {
                   await postToNostr(privateKey, jsonBody);
                   newFriendPrivKey = privateKey;
+                  addingFriend = content;
                 } else {
                   newFriendPrivKey = scannedPrivKey;
-                }
-                if (privateKey != null && successfulPost) {
-                  addingFriend = content;
                 }
               } else if (content['globalKey'] != globalKey &&
                   content['type'] != 'handshake' &&

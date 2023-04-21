@@ -36,8 +36,6 @@ class QRScannerPage extends StatefulWidget {
 }
 
 class _QRScannerPageState extends State<QRScannerPage> {
-  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
-      GlobalKey<ScaffoldMessengerState>();
   late MobileScannerController cameraController;
   String? _previousBarcodeValue;
   String _userName = '';
@@ -49,6 +47,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
   bool _isLoading = false;
 
   late Timer _timer;
+  late Timer _timer2;
 
   @override
   void initState() {
@@ -57,6 +56,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
     _timer = Timer.periodic(loopTime, (timer) async {
       if (!addingFriendInProgress) {
         _updateKey();
+      }
+    });
+    _timer2 = Timer.periodic(const Duration(milliseconds: 100), (timer) async {
+      if (successfulPost) {
+        await getPhotoandAddFriend();
       }
     });
     _loadUserData();
@@ -68,6 +72,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
       closeSubscription(subscriptionId: _previousId);
     }
     _timer.cancel();
+    _timer2.cancel();
     _stopCamera();
     super.dispose();
   }
@@ -131,7 +136,10 @@ class _QRScannerPageState extends State<QRScannerPage> {
       }
       await Future.delayed(checkInterval);
     }
+    return await getPhotoandAddFriend();
+  }
 
+  Future<bool> getPhotoandAddFriend() async {
     if (addingFriend.isNotEmpty) {
       addingFriendInProgress = true;
       Map<String, dynamic> content = addingFriend;
@@ -330,7 +338,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                                 '", "globalKey": "' +
                                                 (globalKey) +
                                                 '"}';
-                                        print('posting');
                                         await postToNostr(
                                             scannedPrivKey, jsonBody);
                                         bool received =
