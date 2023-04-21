@@ -1,1 +1,1 @@
-# FS Trust
+# FairShare

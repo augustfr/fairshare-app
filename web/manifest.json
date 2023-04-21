@@ -1,6 +1,6 @@
 {
-    "name": "fs_trust",
-    "short_name": "fs_trust",
+    "name": "FairShare",
+    "short_name": "FairShare",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
