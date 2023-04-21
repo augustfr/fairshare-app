@@ -104,7 +104,6 @@ class _FriendsListPageState extends State<FriendsListPage> {
   Future<void> _loadFriends() async {
     List<Map<String, dynamic>> updatedFriends =
         await Future.wait(await _updateFriendsList());
-    print(updatedFriends);
     _friendsStreamController.add(updatedFriends);
   }
 

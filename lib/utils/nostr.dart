@@ -12,7 +12,6 @@ import '../pages/home_page.dart';
 import '../pages/friends_list_page.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:encrypt/encrypt.dart';
-import 'package:encrypt/encrypt_io.dart';
 import '../pages/qr_scanner.dart';
 
 String relay = 'wss://nostr.fairshare.social';
@@ -54,6 +53,14 @@ Future<void> connectWebSocket() async {
               break;
             }
           }
+          if (privateKey == null) {
+            if (pubKey == prefs.getString('cycling_pub_key')) {
+              privateKey = prefs.getString('cycling_priv_key');
+            } else if (pubKey == scannedPubKey) {
+              privateKey = scannedPrivKey;
+            }
+          }
+
           if (privateKey != null) {
             try {
               String decryptedContent = decrypt(privateKey, encryptedContent);
@@ -62,6 +69,7 @@ Future<void> connectWebSocket() async {
               content = json.decode(encryptedContent);
             }
           }
+
           if (content != null) {
             int? lastReceived = await getLatestReceivedEvent(pubKey);
             String globalKey = prefs.getString('global_key') ?? '';
@@ -118,7 +126,7 @@ Future<void> connectWebSocket() async {
               }
             }
             // print(pubKey + ': ');
-            // print(content);
+            // print(event);
           }
         }
       }
@@ -221,7 +229,7 @@ String getPublicKey(privateKey) {
 Future<void> postToNostr(String privateKey, String content) async {
   print('Posting to Nostr: ' +
       content +
-      'at this pub key: ' +
+      ' at this pub key: ' +
       getPublicKey(privateKey));
   String encryptedContent = encrypt(privateKey, content);
   Event eventToSend = Event.from(

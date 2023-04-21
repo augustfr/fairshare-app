@@ -115,7 +115,6 @@ class _QRScannerPageState extends State<QRScannerPage> {
       String globalKey = content['globalKey'];
       String? photoPath =
           await _promptForPhoto(friendName, _privateKey, CameraDevice.rear);
-      print(photoPath);
       Map<String, String> jsonMap = {
         "name": friendName,
         "privateKey": newFriendPrivKey,
