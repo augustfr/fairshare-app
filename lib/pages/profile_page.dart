@@ -18,6 +18,8 @@ class _ProfilePageState extends State<ProfilePage> {
   String? _name;
   String? _globalKey;
 
+  List<String> _relays = [];
+
   @override
   void initState() {
     super.initState();
@@ -28,10 +30,11 @@ class _ProfilePageState extends State<ProfilePage> {
     SharedPreferences prefs = SharedPreferencesHelper().prefs;
     String? name = prefs.getString('user_name');
     String? globalKey = prefs.getString('global_key');
-
+    List<String>? relays = prefs.getStringList('relays') ?? [];
     setState(() {
       _name = name;
       _globalKey = getPublicKey(globalKey);
+      _relays = relays;
     });
   }
 
@@ -52,8 +55,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             TextButton(
               onPressed: () async {
-                await prefs.clear(); // Clear all stored data
-// Close the app
+                await prefs.clear();
                 if (Platform.isAndroid) {
                   SystemChannels.platform
                       .invokeMethod<void>('SystemNavigator.pop');
@@ -92,6 +94,48 @@ class _ProfilePageState extends State<ProfilePage> {
                 );
               },
               child: const Text('Remove'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _updateRelay(int index) async {
+    final TextEditingController _textController =
+        TextEditingController(text: "wss://");
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Update Relay'),
+          content: TextField(
+            controller: _textController,
+            decoration: const InputDecoration(hintText: 'Enter new name'),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Update'),
+              onPressed: () async {
+                final String newRelayName = _textController.text;
+                final SharedPreferences prefs =
+                    await SharedPreferences.getInstance();
+                final List<String> relays =
+                    prefs.getStringList('relays') ?? <String>[];
+                relays[index] = newRelayName;
+                await prefs.setStringList('relays', relays);
+                await connectWebSocket();
+                setState(() {
+                  _relays = relays;
+                });
+                Navigator.of(context).pop();
+              },
             ),
           ],
         );
@@ -150,71 +194,106 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned(
-              top: 10,
-              left: 10,
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            Center(
-              child: GestureDetector(
-                onTap: () => _showNameInputDialog(context),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 20),
-                    Text(
-                      _name ?? 'Anonymous',
-                      style: Theme.of(context).textTheme.headlineSmall!,
-                    ),
-                    GestureDetector(
-                      onTap: () => _copyToClipboard(),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        margin: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          color: Colors.grey[200],
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Colors.grey,
-                              blurRadius: 5.0,
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'User ID',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            SelectableText(
-                              _globalKey ?? 'Anonymous',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall!
-                                  .copyWith(
-                                    fontSize: 14.0,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+        child: SingleChildScrollView(
+          child: Stack(
+            children: [
+              Positioned(
+                top: 10,
+                left: 10,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => Navigator.pop(context),
                 ),
               ),
-            ),
-          ],
+              Center(
+                child: GestureDetector(
+                  onTap: () => _showNameInputDialog(context),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 20),
+                      Text(
+                        _name ?? 'Anonymous',
+                        style: Theme.of(context).textTheme.headlineSmall!,
+                      ),
+                      GestureDetector(
+                        onTap: () => _copyToClipboard(),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          margin: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            color: Colors.grey[200],
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.grey,
+                                blurRadius: 5.0,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'User ID',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              SelectableText(
+                                _globalKey ?? 'Anonymous',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall!
+                                    .copyWith(
+                                      fontSize: 14.0,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Relays:',
+                        style: Theme.of(context).textTheme.headlineSmall!,
+                      ),
+                      const SizedBox(height: 10),
+                      Column(
+                        children: List.generate(_relays.length, (index) {
+                          return GestureDetector(
+                            onTap: () {
+                              _updateRelay(index);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              margin: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                color: Colors.grey[200],
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.grey,
+                                    blurRadius: 5.0,
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                _relays[index],
+                                style: Theme.of(context).textTheme.subtitle1,
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: Padding(

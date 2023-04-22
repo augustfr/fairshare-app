@@ -167,6 +167,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeAsyncDependencies() async {
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
+    List<String> relays = prefs.getStringList('relays') ?? [];
+    if (relays.isEmpty) {
+      prefs.setStringList('relays', defaultRelays);
+    }
     await connectWebSocket();
     await cleanSubscriptions();
     await _fetchAndUpdateData();
@@ -216,6 +221,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         builder: (BuildContext context) => const UserDetailsDialog(),
       );
       prefs.setBool('first_time', false);
+      prefs.setStringList('relays', defaultRelays);
     }
   }
 
