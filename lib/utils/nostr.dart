@@ -207,19 +207,21 @@ Future<List<String>> addSubscription({required List<String> publicKeys}) async {
 }
 
 Future<void> closeSubscription({required List<String> subscriptionIds}) async {
-  assert(subscriptionIds.length == webSockets.length);
+  if (subscriptionIds.isNotEmpty) {
+    assert(subscriptionIds.length == webSockets.length);
 
-  for (int i = 0; i < subscriptionIds.length; i++) {
-    var close = Close(subscriptionIds[i]);
+    for (int i = 0; i < subscriptionIds.length; i++) {
+      var close = Close(subscriptionIds[i]);
 
-    // if (webSockets[i] == null) {
-    //   print('reconnecting websocket');
-    //   await connectWebSocket();
-    // }
+      // if (webSockets[i] == null) {
+      //   print('reconnecting websocket');
+      //   await connectWebSocket();
+      // }
 
-    if (webSockets[i] != null) {
-      webSockets[i]!.add(close.serialize());
-      print('closed subscription (id: ' + subscriptionIds[i] + ')');
+      if (webSockets[i] != null) {
+        webSockets[i]!.add(close.serialize());
+        print('closed subscription (id: ' + subscriptionIds[i] + ')');
+      }
     }
   }
 }
