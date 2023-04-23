@@ -33,7 +33,7 @@ Map<String, dynamic> latestLocationTimestamps = {};
 bool receivedFriendRequest = false;
 String newFriendPrivKey = '';
 
-String eventId = '';
+String eventSig = '';
 
 bool successfulPost = false;
 
@@ -56,9 +56,9 @@ Future<void> connectWebSocket() async {
           isConnected[i] = true;
           webSockets[i]!.listen((event) async {
             if (event.contains('EVENT')) {
-              String currentEventId = getEventId(event);
-              if (currentEventId != eventId) {
-                eventId = currentEventId;
+              String currentEventSig = getEventSig(event);
+              if (currentEventSig != eventSig) {
+                eventSig = currentEventSig;
                 String pubKey = getPubkey(event);
                 String encryptedContent = getContent(event);
                 List<dynamic> friendsList = await loadFriends();
@@ -98,7 +98,6 @@ Future<void> connectWebSocket() async {
                     prefs.setInt('my_latest_post_timestamp', timestamp);
                     successfulPost = true;
                     print('Successfully posted to Nostr: ');
-                    print(content);
                   } else {
                     if (((pubKey == prefs.getString('cycling_pub_key')) ||
                             pubKey == scannedPubKey) &&
@@ -276,12 +275,12 @@ int getCreatedAt(String input) {
   return content;
 }
 
-String getEventId(String input) {
+String getEventSig(String input) {
   // Parse the input string into a list
   List<dynamic> list = jsonDecode(input);
 
   // Get the content field from the third element of the list
-  String content = list[2]['id'];
+  String content = list[2]['sig'];
 
   // Return the content
   return content;

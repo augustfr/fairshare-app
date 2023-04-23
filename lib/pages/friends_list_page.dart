@@ -34,6 +34,10 @@ class _FriendsListPageState extends State<FriendsListPage> {
       StreamController<List<Map<String, dynamic>>>.broadcast();
   Timer? _timer;
 
+  Future<void> _handleRefresh() async {
+    await _loadFriends();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -300,82 +304,88 @@ class _FriendsListPageState extends State<FriendsListPage> {
                     return Center(child: Text('Error: ${snapshot.error}'));
                   } else {
                     List<Map<String, dynamic>> friends = snapshot.data!;
-                    return ListView.builder(
-                      itemCount: friends.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        if (friends.isEmpty) {
-                          return const Center(child: Text('No friends found.'));
-                        }
-                        Map<String, dynamic> friend = friends[index];
-                        bool hasUnreadMessages =
-                            unreadMessageIndexes.contains(index);
-                        return Dismissible(
-                          key: Key(friend['name']),
-                          direction: DismissDirection.endToStart,
-                          confirmDismiss: (direction) async {
-                            await _showDeleteConfirmationDialog(index);
-                            return false;
+                    return RefreshIndicator(
+                        onRefresh: _handleRefresh,
+                        child: ListView.builder(
+                          itemCount: friends.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            if (friends.isEmpty) {
+                              return const Center(
+                                  child: Text('No friends found.'));
+                            }
+                            Map<String, dynamic> friend = friends[index];
+                            bool hasUnreadMessages =
+                                unreadMessageIndexes.contains(index);
+                            return Dismissible(
+                              key: Key(friend['name']),
+                              direction: DismissDirection.endToStart,
+                              confirmDismiss: (direction) async {
+                                await _showDeleteConfirmationDialog(index);
+                                return false;
+                              },
+                              background: Container(
+                                color: Colors.red,
+                                child: const Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Padding(
+                                    padding: EdgeInsets.only(right: 20.0),
+                                    child:
+                                        Icon(Icons.delete, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                              child: Stack(
+                                children: [
+                                  ListTile(
+                                    leading: InkWell(
+                                      onTap: () async {
+                                        await _showConfirmNewPhotoDialog(index);
+                                      },
+                                      child: CircleAvatar(
+                                        backgroundImage:
+                                            friend['photoPath'] == null
+                                                ? null
+                                                : FileImage(
+                                                    File(friend['photoPath'])),
+                                      ),
+                                    ),
+                                    title: Text(friend['name']),
+                                    subtitle: Text(friend['distance'] +
+                                        ' ' +
+                                        formatDuration(friend['timeElapsed'])),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ChatPage(
+                                              friendName: friend['name'],
+                                              sharedKey: friend['privateKey'],
+                                              friendIndex: index),
+                                        ),
+                                      );
+                                    },
+                                    onLongPress: () async {
+                                      await _showEditNameDialog(index);
+                                    },
+                                  ),
+                                  if (hasUnreadMessages)
+                                    Positioned(
+                                      bottom: 25,
+                                      right: 20,
+                                      child: Align(
+                                        alignment: Alignment.center,
+                                        child: Transform.scale(
+                                          scale: 0.5,
+                                          child: const Icon(Icons.circle,
+                                              color: Colors.red),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
                           },
-                          background: Container(
-                            color: Colors.red,
-                            child: const Align(
-                              alignment: Alignment.centerRight,
-                              child: Padding(
-                                padding: EdgeInsets.only(right: 20.0),
-                                child: Icon(Icons.delete, color: Colors.white),
-                              ),
-                            ),
-                          ),
-                          child: Stack(
-                            children: [
-                              ListTile(
-                                leading: InkWell(
-                                  onTap: () async {
-                                    await _showConfirmNewPhotoDialog(index);
-                                  },
-                                  child: CircleAvatar(
-                                    backgroundImage: friend['photoPath'] == null
-                                        ? null
-                                        : FileImage(File(friend['photoPath'])),
-                                  ),
-                                ),
-                                title: Text(friend['name']),
-                                subtitle: Text(friend['distance'] +
-                                    ' ' +
-                                    formatDuration(friend['timeElapsed'])),
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ChatPage(
-                                          friendName: friend['name'],
-                                          sharedKey: friend['privateKey'],
-                                          friendIndex: index),
-                                    ),
-                                  );
-                                },
-                                onLongPress: () async {
-                                  await _showEditNameDialog(index);
-                                },
-                              ),
-                              if (hasUnreadMessages)
-                                Positioned(
-                                  bottom: 25,
-                                  right: 20,
-                                  child: Align(
-                                    alignment: Alignment.center,
-                                    child: Transform.scale(
-                                      scale: 0.5,
-                                      child: const Icon(Icons.circle,
-                                          color: Colors.red),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
+                        ));
                   }
                 },
               ),
