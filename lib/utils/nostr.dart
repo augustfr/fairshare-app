@@ -136,6 +136,7 @@ Future<void> connectWebSocket() async {
                         addingFriend = content;
                       }
                     } else if (content['globalKey'] != globalKey &&
+                        content['globalKey'] != globalKeyPriv &&
                         content['type'] != 'handshake' &&
                         content['type'] != null &&
                         content['globalKey'] != null) {
