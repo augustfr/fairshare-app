@@ -37,16 +37,23 @@ String eventId = '';
 
 bool successfulPost = false;
 
+List<bool> isConnected = List<bool>.empty(growable: true);
+
 Future<void> connectWebSocket() async {
+  await closeAllWebSockets();
   SharedPreferences prefs = SharedPreferencesHelper().prefs;
   List<String>? relays = prefs.getStringList('relays');
   if (relays != null) {
+    if (isConnected.length != relays.length) {
+      isConnected = List<bool>.filled(relays.length, false);
+    }
     for (int i = 0; i < relays.length; i++) {
       if (webSockets[i] == null ||
           webSockets[i]!.readyState == WebSocket.closed) {
         try {
           webSockets[i] = await WebSocket.connect(relays[i]);
           print('Websocket connection made ' + relays[i]);
+          isConnected[i] = true;
           webSockets[i]!.listen((event) async {
             if (event.contains('EVENT')) {
               String currentEventId = getEventId(event);
@@ -156,13 +163,14 @@ Future<void> connectWebSocket() async {
             await webSockets[i]!.close();
             webSockets[i] = null;
           }
+          isConnected[i] = false;
         }
       }
     }
   }
 }
 
-Future<void> closeWebSocket() async {
+Future<void> closeAllWebSockets() async {
   SharedPreferences prefs = SharedPreferencesHelper().prefs;
   List<String>? relays = prefs.getStringList('relays');
   if (relays != null) {
@@ -172,6 +180,15 @@ Future<void> closeWebSocket() async {
       }
     }
     webSockets = List.filled(relays.length, null);
+  }
+}
+
+Future<void> closeWebSocket(int index) async {
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
+  List<String>? relays = prefs.getStringList('relays');
+  if (relays != null && index >= 0 && index < webSockets.length) {
+    await webSockets[index]?.close();
+    webSockets[index] = null;
   }
 }
 

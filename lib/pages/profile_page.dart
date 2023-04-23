@@ -33,7 +33,7 @@ class _ProfilePageState extends State<ProfilePage> {
     List<String>? relays = prefs.getStringList('relays') ?? [];
     setState(() {
       _name = name;
-      _globalKey = getPublicKey(globalKey);
+      _globalKey = globalKey;
       _relays = relays;
     });
   }
@@ -102,6 +102,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _updateRelay(int index) async {
+    await closeWebSocket(index);
     final TextEditingController _textController =
         TextEditingController(text: "wss://");
     await showDialog(
@@ -124,8 +125,7 @@ class _ProfilePageState extends State<ProfilePage> {
               child: const Text('Update'),
               onPressed: () async {
                 final String newRelayName = _textController.text;
-                final SharedPreferences prefs =
-                    await SharedPreferences.getInstance();
+                final SharedPreferences prefs = SharedPreferencesHelper().prefs;
                 final List<String> relays =
                     prefs.getStringList('relays') ?? <String>[];
                 relays[index] = newRelayName;
@@ -141,6 +141,15 @@ class _ProfilePageState extends State<ProfilePage> {
         );
       },
     );
+  }
+
+  void _refresh() async {
+    await connectWebSocket();
+    final SharedPreferences prefs = SharedPreferencesHelper().prefs;
+    final List<String> relays = prefs.getStringList('relays') ?? <String>[];
+    setState(() {
+      _relays = relays;
+    });
   }
 
   void _copyToClipboard() {
@@ -256,9 +265,22 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      Text(
-                        'Relays:',
-                        style: Theme.of(context).textTheme.headlineSmall!,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Relays:',
+                            style: Theme.of(context).textTheme.headlineSmall!,
+                          ),
+                          const SizedBox(width: 10),
+                          InkWell(
+                            onTap: () => _refresh(),
+                            child: const Icon(
+                              Icons.refresh,
+                              size: 24,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 10),
                       Column(
@@ -279,10 +301,17 @@ class _ProfilePageState extends State<ProfilePage> {
                                     blurRadius: 5.0,
                                   ),
                                 ],
+                                border: Border.all(
+                                  color: isConnected.isNotEmpty &&
+                                          isConnected[index]
+                                      ? Colors.green
+                                      : Colors.red,
+                                  width: 2,
+                                ),
                               ),
                               child: Text(
                                 _relays[index],
-                                style: Theme.of(context).textTheme.subtitle1,
+                                style: Theme.of(context).textTheme.titleMedium,
                               ),
                             ),
                           );
