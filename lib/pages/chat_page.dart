@@ -144,7 +144,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
       String content = jsonEncode({
         'type': 'message',
-        'globalKey': globalKey,
+        'globalKey': getPublicKey(globalKey),
         'message': text.trim(),
       });
       String pubKey = getPublicKey(widget.sharedKey);

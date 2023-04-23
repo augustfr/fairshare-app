@@ -21,20 +21,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   List<String> _relays = [];
 
-  final List<String> _debugMessages = [];
-
-  ScrollController _debugScrollController = ScrollController();
-
   @override
   void initState() {
     super.initState();
     _loadUserDetails();
-  }
-
-  void addDebugMessage(String message) {
-    setState(() {
-      _debugMessages.insert(0, message);
-    });
   }
 
   Future<void> _loadUserDetails() async {
@@ -44,7 +34,7 @@ class _ProfilePageState extends State<ProfilePage> {
     List<String>? relays = prefs.getStringList('relays') ?? [];
     setState(() {
       _name = name;
-      _globalKey = globalKey;
+      _globalKey = getPublicKey(globalKey);
       _relays = relays;
     });
   }
@@ -224,11 +214,20 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
-      child: ListView.builder(
-        itemCount: DebugHelper().debugMessages.length,
-        itemBuilder: (BuildContext context, int index) {
-          return ListTile(
-            title: Text(DebugHelper().debugMessages[index]),
+      child: StreamBuilder<String>(
+        stream: DebugHelper().debugMessagesStream,
+        builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text('Error loading debug messages'),
+            );
+          }
+          return ListView(
+            reverse: true,
+            children: DebugHelper()
+                .debugMessages
+                .map((message) => ListTile(title: Text(message)))
+                .toList(),
           );
         },
       ),
@@ -240,91 +239,31 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          child: Stack(
+          child: Column(
             children: [
-              Positioned(
-                top: 10,
-                left: 10,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
-              Center(
-                child: GestureDetector(
-                  onTap: () => _showNameInputDialog(context),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 20),
-                      Text(
-                        _name ?? 'Anonymous',
-                        style: Theme.of(context).textTheme.headlineSmall!,
-                      ),
-                      GestureDetector(
-                        onTap: () => _copyToClipboard(),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          margin: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            color: Colors.grey[200],
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.grey,
-                                blurRadius: 5.0,
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'User ID',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              SelectableText(
-                                _globalKey ?? 'Anonymous',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall!
-                                    .copyWith(
-                                      fontSize: 14.0,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
+              Stack(
+                children: [
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  Center(
+                    child: GestureDetector(
+                      onTap: () => _showNameInputDialog(context),
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
+                          const SizedBox(height: 20),
                           Text(
-                            'Relays:',
+                            _name ?? 'Anonymous',
                             style: Theme.of(context).textTheme.headlineSmall!,
                           ),
-                          const SizedBox(width: 10),
-                          InkWell(
-                            onTap: () => _refresh(),
-                            child: const Icon(
-                              Icons.refresh,
-                              size: 24,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Column(
-                        children: List.generate(_relays.length, (index) {
-                          return GestureDetector(
-                            onTap: () {
-                              _updateRelay(index);
-                            },
+                          GestureDetector(
+                            onTap: () => _copyToClipboard(),
                             child: Container(
                               padding: const EdgeInsets.all(10),
                               margin: const EdgeInsets.all(20),
@@ -337,56 +276,126 @@ class _ProfilePageState extends State<ProfilePage> {
                                     blurRadius: 5.0,
                                   ),
                                 ],
-                                border: Border.all(
-                                  color: isConnected.isNotEmpty &&
-                                          isConnected[index]
-                                      ? Colors.green
-                                      : Colors.red,
-                                  width: 2,
-                                ),
                               ),
-                              child: Text(
-                                _relays[index],
-                                style: Theme.of(context).textTheme.titleMedium,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'User ID',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  SelectableText(
+                                    _globalKey ?? 'Anonymous',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall!
+                                        .copyWith(
+                                          fontSize: 14.0,
+                                        ),
+                                  ),
+                                ],
                               ),
                             ),
-                          );
-                        }),
-                      ),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildDebugWindow(),
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Relays:',
+                                style:
+                                    Theme.of(context).textTheme.headlineSmall!,
+                              ),
+                              const SizedBox(width: 10),
+                              InkWell(
+                                onTap: () => _refresh(),
+                                child: const Icon(
+                                  Icons.refresh,
+                                  size: 24,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Column(
+                            children: List.generate(_relays.length, (index) {
+                              return GestureDetector(
+                                onTap: () {
+                                  _updateRelay(index);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  margin: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    color: Colors.grey[200],
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Colors.grey,
+                                        blurRadius: 5.0,
+                                      ),
+                                    ],
+                                    border: Border.all(
+                                      color: isConnected.isNotEmpty &&
+                                              isConnected[index]
+                                          ? Colors.green
+                                          : Colors.red,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _relays[index],
+                                    style:
+                                        Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 30),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildDebugWindow(),
+                ],
+              ),
+              const SizedBox(height: 50),
+              Padding(
+                padding: const EdgeInsets.all(50.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton(
+                      onPressed: _removeAllFriends,
+                      child: const Text('Remove All Friends'),
+                      style: ButtonStyle(
+                        backgroundColor:
+                            MaterialStateProperty.all<Color>(Colors.red),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: _resetAndCloseApp,
+                      child: const Text('Delete All Data'),
+                      style: ButtonStyle(
+                        backgroundColor:
+                            MaterialStateProperty.all<Color>(Colors.red),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(50.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ElevatedButton(
-              onPressed: _removeAllFriends,
-              child: const Text('Remove All Friends'),
-              style: ButtonStyle(
-                backgroundColor: MaterialStateProperty.all<Color>(Colors.red),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: _resetAndCloseApp,
-              child: const Text('Delete All Data'),
-              style: ButtonStyle(
-                backgroundColor: MaterialStateProperty.all<Color>(Colors.red),
-              ),
-            ),
-          ],
         ),
       ),
     );

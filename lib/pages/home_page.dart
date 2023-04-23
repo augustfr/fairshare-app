@@ -125,7 +125,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final content = jsonEncode({
           'type': 'locationUpdate',
           'currentLocation': myCurrentLocation.toString(),
-          'globalKey': globalKey
+          'globalKey': getPublicKey(globalKey)
         });
         await postToNostr(sharedKey, content);
       }

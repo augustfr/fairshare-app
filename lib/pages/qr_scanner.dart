@@ -350,7 +350,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
                                                 '", "currentLocation": "' +
                                                 _currentLocationString +
                                                 '", "globalKey": "' +
-                                                (globalKey) +
+                                                getPublicKey(globalKey) +
                                                 '"}';
                                         await postToNostr(
                                             scannedPrivKey, jsonBody);

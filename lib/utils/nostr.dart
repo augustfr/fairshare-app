@@ -97,7 +97,8 @@ Future<void> connectWebSocket() async {
                       await getLatestReceivedEvent(pubKey);
                   int? lastReceived = latestEventInfo.item1;
                   String? lastEventSig = latestEventInfo.item2;
-                  String globalKey = prefs.getString('global_key') ?? '';
+                  String globalKeyPriv = prefs.getString('global_key') ?? '';
+                  String globalKey = getPublicKey(globalKeyPriv);
                   int timestamp = getCreatedAt(event);
                   int myLatestPost =
                       prefs.getInt('my_latest_post_timestamp') ?? 0;
