@@ -6,6 +6,7 @@ import '../utils/nostr.dart';
 import '../utils/friends.dart';
 import '../pages/home_page.dart';
 import '../main.dart';
+import '../utils/debug_helper.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -20,10 +21,20 @@ class _ProfilePageState extends State<ProfilePage> {
 
   List<String> _relays = [];
 
+  final List<String> _debugMessages = [];
+
+  ScrollController _debugScrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
     _loadUserDetails();
+  }
+
+  void addDebugMessage(String message) {
+    setState(() {
+      _debugMessages.insert(0, message);
+    });
   }
 
   Future<void> _loadUserDetails() async {
@@ -199,6 +210,31 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Widget _buildDebugWindow() {
+    return Container(
+      margin: const EdgeInsets.all(20),
+      height: 200,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        color: Colors.grey[200],
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.grey,
+            blurRadius: 5.0,
+          ),
+        ],
+      ),
+      child: ListView.builder(
+        itemCount: DebugHelper().debugMessages.length,
+        itemBuilder: (BuildContext context, int index) {
+          return ListTile(
+            title: Text(DebugHelper().debugMessages[index]),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -316,6 +352,12 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           );
                         }),
+                      ),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildDebugWindow(),
+                        ],
                       ),
                     ],
                   ),

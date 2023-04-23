@@ -36,21 +36,28 @@ class Message {
   Message(this.text, this.globalKey, this.timestamp);
 }
 
-class _ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final TextEditingController _textController = TextEditingController();
   final List<Message> _messages = [];
   late Timer _timer;
   String _myGlobalKey = ''; // added state variable
   final ScrollController _scrollController = ScrollController();
 
-  bool _keyboardVisible = false;
+  @override
+  void didChangeMetrics() {
+    final mediaQuery = MediaQuery.of(context);
+    if (mediaQuery.viewInsets.bottom > 0) {
+      _scrollToBottom();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _displayMessages(widget.sharedKey, widget.friendIndex);
     _getGlobalKey().then((value) {
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
         if (needsMessageUpdate) {
           _displayMessages(widget.sharedKey, widget.friendIndex);
         }
@@ -58,6 +65,16 @@ class _ChatPageState extends State<ChatPage> {
       setState(() {
         _myGlobalKey = value;
       });
+    });
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -88,13 +105,13 @@ class _ChatPageState extends State<ChatPage> {
       _messages.addAll(fetchedMessages);
     });
 
-    if (!_keyboardVisible) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
-    }
+    });
 
     // Update the latestSeenMessage in friendsList
     if (fetchedMessages.isNotEmpty) {
@@ -140,6 +157,7 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void dispose() {
     _timer.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -154,24 +172,6 @@ class _ChatPageState extends State<ChatPage> {
           children: [
             Expanded(
               child: NotificationListener<ScrollNotification>(
-                onNotification: (notification) {
-                  // Detect keyboard visibility based on scroll position
-                  final pixels = notification.metrics.pixels;
-                  final maxScrollExtent = notification.metrics.maxScrollExtent;
-                  final minScrollExtent = notification.metrics.minScrollExtent;
-                  final inScrollArea =
-                      pixels < maxScrollExtent && pixels > minScrollExtent;
-                  final isScrolling =
-                      notification is ScrollUpdateNotification ||
-                          notification is OverscrollNotification;
-                  final visible = isScrolling || inScrollArea;
-                  if (_keyboardVisible != visible) {
-                    setState(() {
-                      _keyboardVisible = visible;
-                    });
-                  }
-                  return false;
-                },
                 child: ListView.builder(
                   controller: _scrollController,
                   itemCount: _messages.length,

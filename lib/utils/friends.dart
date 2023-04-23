@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter_vibrate/flutter_vibrate.dart';
 import '../utils/nostr.dart';
 import 'package:synchronized/synchronized.dart';
+import 'package:tuple/tuple.dart';
 import './messages.dart';
 import '../main.dart';
 
@@ -81,6 +82,19 @@ Future<void> setLatestReceivedEvent(int createdAt, String pubKey) async {
   });
 }
 
+Future<void> setLatestReceivedEventSig(String eventSig, String pubKey) async {
+  await _lock.synchronized(() async {
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
+    String? jsonString = prefs.getString('latestEventSigs');
+    if (jsonString != null) {
+      latestEventSigs = json.decode(jsonString) as Map<String, dynamic>;
+    }
+    latestEventSigs[pubKey] = eventSig;
+    String newString = json.encode(latestEventSigs);
+    await prefs.setString('latestEventSigs', newString);
+  });
+}
+
 Future<void> setLatestLocationUpdate(int createdAt, String pubKey) async {
   SharedPreferences prefs = SharedPreferencesHelper().prefs;
   String? jsonString = prefs.getString('latestLocationTimestamps');
@@ -101,13 +115,24 @@ Future<int?> getLatestLocationUpdate(String pubKey) async {
   return latestEventTimestamps[pubKey];
 }
 
-Future<int?> getLatestReceivedEvent(String pubKey) async {
+Future<Tuple2<int?, String?>> getLatestReceivedEvent(String pubKey) async {
   SharedPreferences prefs = SharedPreferencesHelper().prefs;
-  String? jsonString = prefs.getString('latestEventTimestamps');
-  if (jsonString != null) {
-    latestEventTimestamps = json.decode(jsonString) as Map<String, dynamic>;
+  String? jsonStringTimestamps = prefs.getString('latestEventTimestamps');
+  String? jsonStringSigs = prefs.getString('latestEventSigs');
+  int? latestEventTimestamp;
+  String? latestEventSig;
+
+  if (jsonStringTimestamps != null) {
+    latestEventTimestamps =
+        json.decode(jsonStringTimestamps) as Map<String, dynamic>;
+    latestEventTimestamp = latestEventTimestamps[pubKey];
   }
-  return latestEventTimestamps[pubKey];
+  if (jsonStringSigs != null) {
+    latestEventSigs = json.decode(jsonStringSigs) as Map<String, dynamic>;
+    latestEventSig = latestEventSigs[pubKey];
+  }
+
+  return Tuple2<int?, String?>(latestEventTimestamp, latestEventSig);
 }
 
 Future<void> removeLatestReceivedEvent(String pubKey) async {

@@ -12,8 +12,10 @@ import '../pages/home_page.dart';
 import '../pages/friends_list_page.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:encrypt/encrypt.dart';
+import 'package:tuple/tuple.dart';
 import '../pages/qr_scanner.dart';
 import '../main.dart';
+import '../utils/debug_helper.dart';
 
 List<String> defaultRelays = [
   'wss://nostr.fairshare.social',
@@ -27,6 +29,8 @@ Timer? timer;
 Map<String, dynamic> addingFriend = {};
 
 Map<String, dynamic> latestEventTimestamps = {};
+
+Map<String, dynamic> latestEventSigs = {};
 
 Map<String, dynamic> latestLocationTimestamps = {};
 
@@ -56,6 +60,7 @@ Future<void> connectWebSocket() async {
           isConnected[i] = true;
           webSockets[i]!.listen((event) async {
             if (event.contains('EVENT')) {
+              //print(event);
               String currentEventSig = getEventSig(event);
               if (currentEventSig != eventSig) {
                 eventSig = currentEventSig;
@@ -88,7 +93,10 @@ Future<void> connectWebSocket() async {
                   }
                 }
                 if (content != null) {
-                  int? lastReceived = await getLatestReceivedEvent(pubKey);
+                  Tuple2<int?, String?> latestEventInfo =
+                      await getLatestReceivedEvent(pubKey);
+                  int? lastReceived = latestEventInfo.item1;
+                  String? lastEventSig = latestEventInfo.item2;
                   String globalKey = prefs.getString('global_key') ?? '';
                   int timestamp = getCreatedAt(event);
                   int myLatestPost =
@@ -97,7 +105,8 @@ Future<void> connectWebSocket() async {
                       timestamp > myLatestPost) {
                     prefs.setInt('my_latest_post_timestamp', timestamp);
                     successfulPost = true;
-                    print('Successfully posted to Nostr: ');
+                    print('Successfully posted to Nostr (' + relays[i] + '):');
+                    print(content);
                   } else {
                     if (((pubKey == prefs.getString('cycling_pub_key')) ||
                             pubKey == scannedPubKey) &&
@@ -129,8 +138,15 @@ Future<void> connectWebSocket() async {
                         content['type'] != 'handshake' &&
                         content['type'] != null &&
                         content['globalKey'] != null) {
-                      if (lastReceived == null || timestamp > lastReceived) {
-                        print('received new event from existing friend');
+                      if ((lastReceived == null || timestamp > lastReceived) &&
+                          (lastEventSig != eventSig)) {
+                        String debugString =
+                            relays[i] + ': ' + jsonEncode(content);
+                        DebugHelper().addDebugMessage(debugString);
+                        print('received new event from existing friend (' +
+                            relays[i] +
+                            '): ');
+                        print(content);
                         if (content['type'] == 'locationUpdate') {
                           int? latestLocationUpdate =
                               await getLatestLocationUpdate(pubKey);
@@ -149,6 +165,7 @@ Future<void> connectWebSocket() async {
                           needsChatListUpdate = true;
                         }
                         await setLatestReceivedEvent(timestamp, pubKey);
+                        await setLatestReceivedEventSig(eventSig, pubKey);
                       }
                     }
                   }
@@ -297,6 +314,10 @@ String getPublicKey(privateKey) {
 
 Future<void> postToNostr(String privateKey, String content) async {
   successfulPost = false;
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
+
+  List<String>? relays = prefs.getStringList('relays');
+
   String encryptedContent = encrypt(privateKey, content);
   Event eventToSend = Event.from(
       kind: 1, tags: [], content: encryptedContent, privkey: privateKey);
@@ -304,12 +325,9 @@ Future<void> postToNostr(String privateKey, String content) async {
   // Iterate through the webSockets list and send the event to each connected WebSocket
   for (int i = 0; i < webSockets.length; i++) {
     try {
-      // if (webSockets[i] == null) {
-      //   print('reconnected websocket');
-      //   await connectWebSocket();
-      // }
-
       if (webSockets[i] != null) {
+        print('attempting to post to: ' + (relays?[i] ?? 'unknown'));
+
         webSockets[i]!.add(eventToSend.serialize());
       }
     } catch (e) {}
