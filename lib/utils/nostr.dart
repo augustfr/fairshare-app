@@ -44,6 +44,7 @@ bool successfulPost = false;
 List<bool> isConnected = List<bool>.empty(growable: true);
 
 Future<void> connectWebSocket() async {
+  print('Starting');
   await closeAllWebSockets();
   SharedPreferences prefs = SharedPreferencesHelper().prefs;
   List<String>? relays = prefs.getStringList('relays');
@@ -55,7 +56,12 @@ Future<void> connectWebSocket() async {
       if (webSockets[i] == null ||
           webSockets[i]!.readyState == WebSocket.closed) {
         try {
-          webSockets[i] = await WebSocket.connect(relays[i]);
+          webSockets[i] = await WebSocket.connect(relays[i]).timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              throw TimeoutException('Connection timeout');
+            },
+          );
           print('Websocket connection made ' + relays[i]);
           isConnected[i] = true;
           webSockets[i]!.listen((event) async {
@@ -184,7 +190,11 @@ Future<void> connectWebSocket() async {
             }
           });
         } catch (e) {
-          print('Failed to connect to: ' + relays[i].toString());
+          if (e is TimeoutException) {
+            print('Failed to connect due to timeout: ' + relays[i].toString());
+          } else {
+            print('Failed to connect to: ' + relays[i].toString());
+          }
           if (webSockets[i] != null) {
             await webSockets[i]!.close();
             webSockets[i] = null;

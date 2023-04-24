@@ -498,7 +498,7 @@ class ChatBubble extends StatelessWidget {
                     ),
                   ),
                 Text(
-                  DateFormat('hh:mm a').format(
+                  DateFormat('h:mm a').format(
                       DateTime.fromMillisecondsSinceEpoch(timestamp * 1000)),
                   style: const TextStyle(
                     color: Colors.grey,
