@@ -210,8 +210,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _checkFirstTimeUser() async {
-    SharedPreferences prefs = SharedPreferencesHelper().prefs;
-
+    SharedPreferences prefs = await SharedPreferences.getInstance();
     bool isFirstTime = prefs.getBool('first_time') ?? true;
 
     if (isFirstTime) {
@@ -221,7 +220,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         builder: (BuildContext context) => const UserDetailsDialog(),
       );
       prefs.setBool('first_time', false);
-      prefs.setStringList('relays', defaultRelays);
     }
   }
 
@@ -466,7 +464,6 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
       SharedPreferences prefs = SharedPreferencesHelper().prefs;
-
       prefs.setString('user_name', _userName);
       prefs.setString('global_key', generateRandomPrivateKey());
       Navigator.of(context).pop();

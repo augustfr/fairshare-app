@@ -259,12 +259,11 @@ class _ProfilePageState extends State<ProfilePage> {
     // Dismiss loading dialog
     Navigator.pop(context);
 
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Data imported successfully."),
-      ),
-    );
+    if (Platform.isAndroid) {
+      SystemChannels.platform.invokeMethod<void>('SystemNavigator.pop');
+    } else if (Platform.isIOS) {
+      exit(0);
+    }
   }
 
   Future<void> _exportData(BuildContext context) async {
