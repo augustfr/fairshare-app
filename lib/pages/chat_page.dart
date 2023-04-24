@@ -214,7 +214,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (messagesHistoryMap.containsKey(publicKey)) {
       List<dynamic> messagesHistory =
           messagesHistoryMap[publicKey] as List<dynamic>;
-      print(messagesHistory);
       for (var message in messagesHistory) {
         fetchedMessages.add(Message(
             type: message['type'], // 'sent' or 'received'
@@ -450,25 +449,11 @@ class ChatBubble extends StatelessWidget {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         double maxWidth = constraints.maxWidth * 0.6;
-        double height = image != null
-            ? maxWidth
-            : (TextPainter(
-                text: TextSpan(
-                  text: text ?? '',
-                  style: TextStyle(
-                    color: isSent ? Colors.white : Colors.black,
-                  ),
-                ),
-                textDirection: TextDirection.ltr,
-                maxLines: 100,
-              )..layout(maxWidth: maxWidth))
-                .height;
         if (listKey?.currentState != null) {
           listKey!.currentState!.insertItem(0);
         }
 
         return SizedBox(
-          height: height,
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
             child: Row(
