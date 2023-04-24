@@ -146,29 +146,86 @@ Future<void> removeLatestReceivedEvent(String pubKey) async {
   }
 }
 
-Future<void> cleanSubscriptions() async {
+Future<void> cleanLocalStorage() async {
   await _lock.synchronized(() async {
     SharedPreferences prefs = SharedPreferencesHelper().prefs;
     await prefs.remove('friends_subscription_id');
     List<String> friendsList = prefs.getStringList('friends') ?? [];
     List<String> subscribedKeys = prefs.getStringList('subscribed_keys') ?? [];
-    bool modified = false;
     List<String> keysToRemove = [];
 
     Set<String> friendsPubKeys = friendsList
         .map((friend) => getPublicKey(jsonDecode(friend)['privateKey']))
         .toSet();
 
-    for (final key in subscribedKeys) {
+    // Combine keys from all shared preferences storage lists
+    Set<String> allKeys = {};
+
+    String? jsonStringLocationTimestamps =
+        prefs.getString('latestLocationTimestamps');
+    String? jsonStringEventSigs = prefs.getString('latestEventSigs');
+    String? jsonStringEventTimestamps =
+        prefs.getString('latestEventTimestamps');
+
+    Map<String, dynamic> latestLocationTimestamps =
+        jsonStringLocationTimestamps != null
+            ? json.decode(jsonStringLocationTimestamps) as Map<String, dynamic>
+            : {};
+    Map<String, dynamic> latestEventSigs = jsonStringEventSigs != null
+        ? json.decode(jsonStringEventSigs) as Map<String, dynamic>
+        : {};
+    Map<String, dynamic> latestEventTimestamps =
+        jsonStringEventTimestamps != null
+            ? json.decode(jsonStringEventTimestamps) as Map<String, dynamic>
+            : {};
+
+    allKeys.addAll(subscribedKeys);
+    allKeys.addAll(latestLocationTimestamps.keys);
+    allKeys.addAll(latestEventSigs.keys);
+    allKeys.addAll(latestEventTimestamps.keys);
+
+    // Identify keys to remove
+    for (final key in allKeys) {
       if (!friendsPubKeys.contains(key)) {
         keysToRemove.add(key);
-        modified = true;
       }
     }
 
+    // Remove keys from subscribedKeys
+    int initialSubscribedKeysLength = subscribedKeys.length;
+    subscribedKeys.removeWhere((key) => keysToRemove.contains(key));
+    bool modified = initialSubscribedKeysLength != subscribedKeys.length;
+
     if (modified) {
-      subscribedKeys.removeWhere((key) => keysToRemove.contains(key));
       await prefs.setStringList('subscribed_keys', subscribedKeys);
+    }
+
+    // Remove keys from other shared preferences storage lists
+    List<Map<String, dynamic>> mapsToClean = [
+      latestLocationTimestamps,
+      latestEventSigs,
+      latestEventTimestamps,
+    ];
+
+    List<String> prefKeys = [
+      'latestLocationTimestamps',
+      'latestEventSigs',
+      'latestEventTimestamps',
+    ];
+
+    for (int i = 0; i < mapsToClean.length; i++) {
+      bool mapModified = false;
+
+      for (final key in keysToRemove) {
+        if (mapsToClean[i].containsKey(key)) {
+          mapsToClean[i].remove(key);
+          mapModified = true;
+        }
+      }
+
+      if (mapModified) {
+        await prefs.setString(prefKeys[i], json.encode(mapsToClean[i]));
+      }
     }
   });
 }

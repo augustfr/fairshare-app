@@ -2,6 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_email_sender/flutter_email_sender.dart';
 import '../utils/nostr.dart';
 import '../utils/friends.dart';
 import '../pages/home_page.dart';
@@ -161,6 +165,213 @@ class _ProfilePageState extends State<ProfilePage> {
         content: Text('User ID copied to clipboard'),
         duration: Duration(seconds: 2),
       ),
+    );
+  }
+
+  Future<void> _importData(BuildContext context) async {
+    TextEditingController _controller = TextEditingController();
+
+    // Prompt user to paste JSON data
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Paste Exported Data"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _controller,
+                decoration: InputDecoration(
+                  labelText: "JSON Data",
+                  hintText: "Paste your exported data here",
+                ),
+                maxLines: 5,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text("Cancel"),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            ),
+            TextButton(
+              child: const Text("Import"),
+              onPressed: () async {
+                String jsonData = _controller.text;
+                Navigator.pop(context);
+                await _processImport(context, jsonData);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _processImport(BuildContext context, String jsonData) async {
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: Container(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                CircularProgressIndicator(),
+                SizedBox(width: 16.0),
+                Text("Importing data..."),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    Map<String, dynamic> data = jsonDecode(jsonData);
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    for (var key in data.keys) {
+      if (key != 'cycling_priv_key' &&
+          key != 'cycling_subscription_id' &&
+          key != 'cycling_pub_key' &&
+          key != 'cycling_subscription_ids') {
+        final value = data[key];
+        if (value is String) {
+          await prefs.setString(key, value);
+        } else if (value is int) {
+          await prefs.setInt(key, value);
+        } else if (value is double) {
+          await prefs.setDouble(key, value);
+        } else if (value is bool) {
+          await prefs.setBool(key, value);
+        } else if (value is List<String>) {
+          await prefs.setStringList(key, value);
+        }
+      }
+    }
+
+    // Dismiss loading dialog
+    Navigator.pop(context);
+
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Data imported successfully."),
+      ),
+    );
+  }
+
+  Future<void> _exportData(BuildContext context) async {
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: Container(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                CircularProgressIndicator(),
+                SizedBox(width: 16.0),
+                Text("Exporting data..."),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    Set<String> keys = prefs.getKeys();
+
+    Map<String, dynamic> data = {};
+    for (var key in keys) {
+      if (key != 'cycling_priv_key' &&
+          key != 'cycling_subscription_id' &&
+          key != 'cycling_pub_key' &&
+          key != 'cycling_subscription_ids') {
+        data[key] = prefs.get(key);
+      }
+    }
+
+    String jsonData = jsonEncode(data);
+
+    Directory appDocDir = await getApplicationDocumentsDirectory();
+    File jsonFile = File('${appDocDir.path}/fairshare_data.json');
+    await jsonFile.writeAsString(jsonData);
+
+    // Dismiss loading dialog
+    Navigator.pop(context);
+
+    // Show data to user
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Exported data"),
+          content: SingleChildScrollView(
+            child: Text(jsonData),
+          ),
+          actions: [
+            TextButton(
+              child: const Text("Copy"),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: jsonData));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Data copied to clipboard."),
+                  ),
+                );
+              },
+            ),
+            TextButton(
+              child: const Text("Email"),
+              onPressed: () async {
+                String subject = "My FairShare data";
+                String body = "Here is my FairShare data.";
+                String filePath = jsonFile.path;
+                List<String> recipients = []; // Add recipients here
+
+                final Email email = Email(
+                  body: body,
+                  subject: subject,
+                  recipients: recipients,
+                  attachmentPaths: [filePath],
+                  isHTML: false,
+                );
+
+                try {
+                  await FlutterEmailSender.send(email);
+                } catch (error) {
+                  print(error);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("Could not send email: $error"),
+                    ),
+                  );
+                }
+              },
+            ),
+            TextButton(
+              child: const Text("Close"),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -391,6 +602,26 @@ class _ProfilePageState extends State<ProfilePage> {
                             MaterialStateProperty.all<Color>(Colors.red),
                       ),
                     ),
+                    ElevatedButton(
+                      onPressed: () {
+                        _exportData(context);
+                      },
+                      child: const Text('Export Data'),
+                      style: ButtonStyle(
+                        backgroundColor:
+                            MaterialStateProperty.all<Color>(Colors.red),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        _importData(context);
+                      },
+                      child: const Text('Import Data'),
+                      style: ButtonStyle(
+                        backgroundColor:
+                            MaterialStateProperty.all<Color>(Colors.red),
+                      ),
+                    )
                   ],
                 ),
               ),

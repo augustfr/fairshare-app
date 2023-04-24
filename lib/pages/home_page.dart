@@ -173,7 +173,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       prefs.setStringList('relays', defaultRelays);
     }
     await connectWebSocket();
-    await cleanSubscriptions();
+    await cleanLocalStorage();
     await _fetchAndUpdateData();
     await _updateFriendsOnMapAndNotifications();
     if (switchValue) {
