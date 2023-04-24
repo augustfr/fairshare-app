@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:intl/intl.dart';
 import '../utils/nostr.dart';
 import '../utils/messages.dart';
 import 'package:synchronized/synchronized.dart';
@@ -42,12 +43,14 @@ class Message {
   final String? media;
   final String globalKey;
   final int timestamp;
+  final bool showDate;
 
   Message(
       {required this.type,
       this.text,
       this.image,
       this.media,
+      required this.showDate,
       required this.globalKey,
       required this.timestamp});
 }
@@ -214,7 +217,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     if (messagesHistoryMap.containsKey(publicKey)) {
       List<dynamic> messagesHistory =
           messagesHistoryMap[publicKey] as List<dynamic>;
+      DateTime? previousDate;
+
       for (var message in messagesHistory) {
+        DateTime currentMessageDate =
+            DateTime.fromMillisecondsSinceEpoch(message['timestamp'] * 1000);
+        bool showDate = false;
+
+        if (previousDate == null ||
+            currentMessageDate.day != previousDate.day ||
+            currentMessageDate.month != previousDate.month ||
+            currentMessageDate.year != previousDate.year) {
+          showDate = true;
+        }
+
         fetchedMessages.add(Message(
             type: message['type'], // 'sent' or 'received'
             media: message['media'] == 'image'
@@ -227,7 +243,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     : null, // set to 'message' if media is null (text message)
             image: message['media'] == 'image' ? message['image'] : null,
             globalKey: message['globalKey'],
-            timestamp: message['timestamp']));
+            timestamp: message['timestamp'],
+            showDate: showDate)); // Set showDate property based on comparison
+
+        previousDate = currentMessageDate;
       }
 
       needsMessageUpdate = false;
@@ -319,6 +338,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       image: _messages[index].image,
                       globalKey: _messages[index].globalKey,
                       myGlobalKey: _myGlobalKey,
+                      timestamp: _messages[index].timestamp,
+                      showDate: _messages[index].showDate,
                     );
                   },
                 ),
@@ -398,6 +419,8 @@ class ChatBubble extends StatelessWidget {
   final String globalKey;
   final String myGlobalKey;
   final GlobalKey<AnimatedListState>? listKey;
+  final int timestamp;
+  final bool showDate;
 
   const ChatBubble({
     Key? key,
@@ -406,6 +429,8 @@ class ChatBubble extends StatelessWidget {
     required this.globalKey,
     required this.myGlobalKey,
     required this.listKey,
+    required this.timestamp,
+    required this.showDate,
   }) : super(key: key);
 
   @override
@@ -446,6 +471,10 @@ class ChatBubble extends StatelessWidget {
             ),
           );
 
+    String formattedDate = DateFormat('EEEE, MMMM d').format(
+      DateTime.fromMillisecondsSinceEpoch(timestamp * 1000),
+    );
+
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         double maxWidth = constraints.maxWidth * 0.6;
@@ -456,29 +485,51 @@ class ChatBubble extends StatelessWidget {
         return SizedBox(
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-            child: Row(
-              mainAxisAlignment:
-                  isSent ? MainAxisAlignment.end : MainAxisAlignment.start,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  constraints: BoxConstraints(maxWidth: maxWidth),
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isSent ? Colors.blue : Colors.grey[300],
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(12),
-                      topRight: const Radius.circular(12),
-                      bottomLeft: isSent
-                          ? const Radius.circular(12)
-                          : const Radius.circular(0),
-                      bottomRight: isSent
-                          ? const Radius.circular(0)
-                          : const Radius.circular(12),
+                if (showDate)
+                  Text(
+                    formattedDate,
+                    style: const TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  child: content,
+                Text(
+                  DateFormat('hh:mm a').format(
+                      DateTime.fromMillisecondsSinceEpoch(timestamp * 1000)),
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 10,
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment:
+                      isSent ? MainAxisAlignment.end : MainAxisAlignment.start,
+                  children: [
+                    Container(
+                      constraints: BoxConstraints(maxWidth: maxWidth),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 10, horizontal: 16),
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isSent ? Colors.blue : Colors.grey[300],
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(12),
+                          topRight: const Radius.circular(12),
+                          bottomLeft: isSent
+                              ? const Radius.circular(12)
+                              : const Radius.circular(0),
+                          bottomRight: isSent
+                              ? const Radius.circular(0)
+                              : const Radius.circular(12),
+                        ),
+                      ),
+                      child: content,
+                    ),
+                  ],
                 ),
               ],
             ),

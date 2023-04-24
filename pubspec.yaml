@@ -37,6 +37,7 @@ dependencies:
   flutter_native_image: ^0.0.6+1
   image_gallery_saver: ^1.7.1
   share: ^2.0.4
+  intl: ^0.18.1
 
 dev_dependencies:
   flutter_test:
