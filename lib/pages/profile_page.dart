@@ -213,6 +213,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _processImport(BuildContext context, String jsonData) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    print(prefs.getString('user_name'));
     // Show loading dialog
     showDialog(
       context: context,
@@ -235,25 +238,21 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     Map<String, dynamic> data = jsonDecode(jsonData);
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-
     for (var key in data.keys) {
-      if (key != 'cycling_priv_key' &&
-          key != 'cycling_subscription_id' &&
-          key != 'cycling_pub_key' &&
-          key != 'cycling_subscription_ids') {
-        final value = data[key];
-        if (value is String) {
-          await prefs.setString(key, value);
-        } else if (value is int) {
-          await prefs.setInt(key, value);
-        } else if (value is double) {
-          await prefs.setDouble(key, value);
-        } else if (value is bool) {
-          await prefs.setBool(key, value);
-        } else if (value is List<String>) {
-          await prefs.setStringList(key, value);
-        }
+      final value = data[key];
+      if (value is String) {
+        await prefs.setString(key, value);
+      } else if (value is int) {
+        await prefs.setInt(key, value);
+      } else if (value is double) {
+        await prefs.setDouble(key, value);
+      } else if (value is bool) {
+        await prefs.setBool(key, value);
+      } else if (value is List<String>) {
+        await prefs.setStringList(key, value);
+      } else if (value is List<dynamic>) {
+        List<String> stringList = value.map((e) => e.toString()).toList();
+        await prefs.setStringList(key, stringList);
       }
     }
 
