@@ -20,6 +20,8 @@ bool needsMessageUpdate = false;
 
 final _lock = Lock();
 
+bool _userScrolling = false;
+
 class ChatPage extends StatefulWidget {
   final String friendName;
   final String sharedKey;
@@ -281,7 +283,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         curve: Curves.easeOut,
       );
     });
-
     // Update the latestSeenMessage in friendsList
     if (fetchedMessages.isNotEmpty) {
       await _lock.synchronized(() async {
