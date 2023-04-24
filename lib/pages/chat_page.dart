@@ -1,10 +1,17 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../utils/nostr.dart';
 import '../utils/messages.dart';
 import 'package:synchronized/synchronized.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter_native_image/flutter_native_image.dart';
+import 'package:path/path.dart' as path;
+import 'package:image/image.dart' as img;
 import './home_page.dart';
 import './friends_list_page.dart';
 
@@ -29,19 +36,30 @@ class ChatPage extends StatefulWidget {
 }
 
 class Message {
-  final String text;
+  final String type;
+  final String? text;
+  final String? image;
+  final String? media;
   final String globalKey;
   final int timestamp;
 
-  Message(this.text, this.globalKey, this.timestamp);
+  Message(
+      {required this.type,
+      this.text,
+      this.image,
+      this.media,
+      required this.globalKey,
+      required this.timestamp});
 }
 
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final TextEditingController _textController = TextEditingController();
   final List<Message> _messages = [];
   late Timer _timer;
-  String _myGlobalKey = ''; // added state variable
+  String _myGlobalKey = '';
   final ScrollController _scrollController = ScrollController();
+  File? _image;
+  final _listKey = GlobalKey<AnimatedListState>();
 
   @override
   void didChangeMetrics() {
@@ -68,6 +86,113 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _getImage(ImageSource source) async {
+    final pickedFile = await ImagePicker().pickImage(source: source);
+    if (pickedFile != null) {
+      setState(() {
+        _image = File(pickedFile.path);
+      });
+      await _sendImage();
+    }
+  }
+
+  Future<void> _sendImage() async {
+    if (_image != null) {
+      String globalKey = await _getGlobalKey();
+      Uint8List imageData;
+      if (await _image!.exists()) {
+        String fileType = path.extension(_image!.path).toLowerCase();
+        if (fileType == '.png') {
+          imageData = await _image!.readAsBytes();
+        } else if (fileType == '.heic') {
+          File convertedFile = await FlutterNativeImage.compressImage(
+            _image!.path,
+            quality: 100, // set the desired quality level here
+            targetWidth: 600, // set the desired width here
+            targetHeight: 600, // set the desired height here
+          );
+          imageData = await compressFile(convertedFile.path);
+        } else {
+          imageData = await compressFile(_image!.path);
+        }
+
+        String content = jsonEncode({
+          'type': 'message',
+          'globalKey': getPublicKey(globalKey),
+          'image': base64Encode(imageData),
+        });
+        String pubKey = getPublicKey(widget.sharedKey);
+        int timestamp = DateTime.now().millisecondsSinceEpoch;
+        int secondsTimestamp = (timestamp / 1000).round();
+        await postToNostr(widget.sharedKey, content);
+        await addSentImage(
+            pubKey, globalKey, base64Encode(imageData), secondsTimestamp);
+        await _displayMessages(widget.sharedKey, widget.friendIndex);
+        _image = null;
+      }
+    }
+  }
+
+  Future<Uint8List> compressFile(String filePath) async {
+    final file = File(filePath);
+    Uint8List imageData = await file.readAsBytes();
+
+    // Set custom dimensions
+    int maxWidth = 800;
+    int maxHeight = 600;
+
+    // Decode image
+    img.Image? originalImage = img.decodeImage(imageData);
+
+    // Check if originalImage is not null
+    if (originalImage != null) {
+      // Calculate aspect ratio
+      double aspectRatio = originalImage.width / originalImage.height;
+      int targetWidth, targetHeight;
+
+      // Determine new dimensions based on aspect ratio
+      if (originalImage.width >= originalImage.height) {
+        targetWidth = maxWidth;
+        targetHeight = (maxWidth / aspectRatio).round();
+      } else {
+        targetHeight = maxHeight;
+        targetWidth = (maxHeight * aspectRatio).round();
+      }
+
+      // Resize image
+      img.Image resizedImage = img.copyResize(
+        originalImage,
+        width: targetWidth,
+        height: targetHeight,
+        interpolation: img.Interpolation.nearest,
+      );
+
+      // Define an initial quality value
+      int quality = 80;
+      Uint8List compressedImage;
+
+      // Compress image iteratively to reach the target size
+      do {
+        // Encode resized image to Uint8List
+        Uint8List resizedImageData =
+            img.encodeJpg(resizedImage, quality: quality);
+
+        // Compress image
+        compressedImage = await FlutterImageCompress.compressWithList(
+          resizedImageData,
+          quality: quality,
+        );
+
+        // Reduce quality by 5 for the next iteration if needed
+        quality -= 5;
+      } while (compressedImage.lengthInBytes > 100 * 1024 && quality > 0);
+
+      return compressedImage;
+    } else {
+      return Uint8List(0);
+    }
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollController.animateTo(
@@ -86,14 +211,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     String messagesHistoryString = prefs.getString('messagesHistory') ?? '{}';
     Map<String, dynamic> messagesHistoryMap = jsonDecode(messagesHistoryString);
-
     if (messagesHistoryMap.containsKey(publicKey)) {
       List<dynamic> messagesHistory =
           messagesHistoryMap[publicKey] as List<dynamic>;
+      print(messagesHistory);
       for (var message in messagesHistory) {
         fetchedMessages.add(Message(
-            message['message'], message['globalKey'], message['timestamp']));
+            type: message['type'], // 'sent' or 'received'
+            media: message['media'] == 'image'
+                ? 'image'
+                : null, // 'image' for images, null for text messages
+            text: message['media'] == 'text'
+                ? message['message']
+                : message['media'] == null
+                    ? message['message']
+                    : null, // set to 'message' if media is null (text message)
+            image: message['media'] == 'image' ? message['image'] : null,
+            globalKey: message['globalKey'],
+            timestamp: message['timestamp']));
       }
+
       needsMessageUpdate = false;
     }
 
@@ -178,7 +315,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   addAutomaticKeepAlives: true,
                   itemBuilder: (BuildContext context, int index) {
                     return ChatBubble(
+                      listKey: _listKey,
                       text: _messages[index].text,
+                      image: _messages[index].image,
                       globalKey: _messages[index].globalKey,
                       myGlobalKey: _myGlobalKey,
                     );
@@ -205,6 +344,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
                   ),
                   const SizedBox(width: 8.0),
+                  IconButton(
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return SafeArea(
+                            child: Wrap(
+                              children: [
+                                ListTile(
+                                  leading: const Icon(Icons.camera_alt),
+                                  title: const Text('Take a picture'),
+                                  onTap: () {
+                                    _getImage(ImageSource.camera);
+                                    Navigator.of(context).pop();
+                                  },
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.image),
+                                  title: const Text('Select from gallery'),
+                                  onTap: () {
+                                    _getImage(ImageSource.gallery);
+                                    Navigator.of(context).pop();
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.image),
+                  ),
+                  const SizedBox(width: 8.0),
                   FloatingActionButton(
                     onPressed: () {
                       _sendMessage(_textController.text);
@@ -222,53 +394,135 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 }
 
 class ChatBubble extends StatelessWidget {
-  final String text;
+  final String? text;
+  final String? image;
   final String globalKey;
   final String myGlobalKey;
+  final GlobalKey<AnimatedListState>? listKey;
 
-  const ChatBubble(
-      {Key? key,
-      required this.text,
-      required this.globalKey,
-      required this.myGlobalKey})
-      : super(key: key);
+  const ChatBubble({
+    Key? key,
+    this.text,
+    this.image,
+    required this.globalKey,
+    required this.myGlobalKey,
+    required this.listKey,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     bool isSent = globalKey == myGlobalKey;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-      child: Row(
-        mainAxisAlignment:
-            isSent ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.6,
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            decoration: BoxDecoration(
-              color: isSent ? Colors.blue : Colors.grey[300],
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(12),
-                topRight: const Radius.circular(12),
-                bottomLeft: isSent
-                    ? const Radius.circular(12)
-                    : const Radius.circular(0),
-                bottomRight: isSent
-                    ? const Radius.circular(0)
-                    : const Radius.circular(12),
+
+    Widget content = image != null
+        ? GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (BuildContext context) {
+                    return Scaffold(
+                      appBar: AppBar(),
+                      body: Center(
+                        child: Image.memory(
+                          base64Decode(image!),
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+            child: AspectRatio(
+              aspectRatio: 1.0,
+              child: Image.memory(
+                base64Decode(image!),
+                fit: BoxFit.cover,
               ),
             ),
-            child: Text(
-              text,
-              style: TextStyle(
-                color: isSent ? Colors.white : Colors.black,
-              ),
+          )
+        : Text(
+            text ?? '',
+            style: TextStyle(
+              color: isSent ? Colors.white : Colors.black,
+            ),
+          );
+
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        double maxWidth = constraints.maxWidth * 0.6;
+        double height = image != null
+            ? maxWidth
+            : (TextPainter(
+                text: TextSpan(
+                  text: text ?? '',
+                  style: TextStyle(
+                    color: isSent ? Colors.white : Colors.black,
+                  ),
+                ),
+                textDirection: TextDirection.ltr,
+                maxLines: 100,
+              )..layout(maxWidth: maxWidth))
+                .height;
+        if (listKey?.currentState != null) {
+          listKey!.currentState!.insertItem(0);
+        }
+
+        return SizedBox(
+          height: height,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+            child: Row(
+              mainAxisAlignment:
+                  isSent ? MainAxisAlignment.end : MainAxisAlignment.start,
+              children: [
+                Container(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isSent ? Colors.blue : Colors.grey[300],
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(12),
+                      topRight: const Radius.circular(12),
+                      bottomLeft: isSent
+                          ? const Radius.circular(12)
+                          : const Radius.circular(0),
+                      bottomRight: isSent
+                          ? const Radius.circular(0)
+                          : const Radius.circular(12),
+                    ),
+                  ),
+                  child: content,
+                ),
+              ],
             ),
           ),
-        ],
+        );
+      },
+    );
+  }
+}
+
+class ImagePage extends StatelessWidget {
+  final String? image;
+
+  const ImagePage({Key? key, required this.image}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(),
+      body: Center(
+        child: image == null
+            ? const Text('No image')
+            : AspectRatio(
+                aspectRatio: 1,
+                child: Image.memory(
+                  base64Decode(image!),
+                  fit: BoxFit.contain,
+                ),
+              ),
       ),
     );
   }

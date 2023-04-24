@@ -144,6 +144,9 @@ Future<void> connectWebSocket() async {
                           (lastEventSig != eventSig)) {
                         String debugString =
                             relays[i] + ': ' + jsonEncode(content);
+                        if (content['image'] != null) {
+                          debugString = relays[i] + ': image received';
+                        }
                         DebugHelper().addDebugMessage(debugString);
                         print('received new event from existing friend (' +
                             relays[i] +
@@ -159,9 +162,14 @@ Future<void> connectWebSocket() async {
                           }
                           needsUpdate = true;
                         } else if (content['type'] == 'message') {
-                          String text = content['message'];
-                          await addReceivedMessage(
-                              pubKey, content['globalKey'], text, timestamp);
+                          if (content['image'] != null) {
+                            await addReceivedImage(
+                                pubKey, globalKey, content['image'], timestamp);
+                          } else {
+                            String text = content['message'];
+                            await addReceivedMessage(
+                                pubKey, content['globalKey'], text, timestamp);
+                          }
                           needsMessageUpdate = true;
                           needsUpdate = true;
                           needsChatListUpdate = true;
@@ -243,15 +251,8 @@ Future<List<String>> addSubscription({required List<String> publicKeys}) async {
 
 Future<void> closeSubscription({required List<String> subscriptionIds}) async {
   if (subscriptionIds.isNotEmpty) {
-    assert(subscriptionIds.length == webSockets.length);
-
     for (int i = 0; i < subscriptionIds.length; i++) {
       var close = Close(subscriptionIds[i]);
-
-      // if (webSockets[i] == null) {
-      //   print('reconnecting websocket');
-      //   await connectWebSocket();
-      // }
 
       if (webSockets[i] != null) {
         webSockets[i]!.add(close.serialize());
