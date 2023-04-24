@@ -44,6 +44,7 @@ class Message {
   final String globalKey;
   final int timestamp;
   final bool showDate;
+  final bool showTime;
 
   Message(
       {required this.type,
@@ -52,6 +53,7 @@ class Message {
       this.media,
       required this.showDate,
       required this.globalKey,
+      required this.showTime,
       required this.timestamp});
 }
 
@@ -218,19 +220,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       List<dynamic> messagesHistory =
           messagesHistoryMap[publicKey] as List<dynamic>;
       DateTime? previousDate;
+      DateTime? previousShownTimestamp;
 
       for (var message in messagesHistory) {
         DateTime currentMessageDate =
             DateTime.fromMillisecondsSinceEpoch(message['timestamp'] * 1000);
         bool showDate = false;
+        bool showTime = false;
 
         if (previousDate == null ||
             currentMessageDate.day != previousDate.day ||
             currentMessageDate.month != previousDate.month ||
             currentMessageDate.year != previousDate.year) {
           showDate = true;
+          showTime = true;
+          previousShownTimestamp = currentMessageDate;
         }
 
+        if (previousShownTimestamp == null ||
+            currentMessageDate.difference(previousShownTimestamp).inMinutes >=
+                10) {
+          showTime = true;
+          previousShownTimestamp = currentMessageDate;
+        }
         fetchedMessages.add(Message(
             type: message['type'], // 'sent' or 'received'
             media: message['media'] == 'image'
@@ -244,7 +256,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             image: message['media'] == 'image' ? message['image'] : null,
             globalKey: message['globalKey'],
             timestamp: message['timestamp'],
-            showDate: showDate)); // Set showDate property based on comparison
+            showDate: showDate, // Set showDate property based on comparison
+            showTime:
+                showTime)); // Set showTime property based on time difference
 
         previousDate = currentMessageDate;
       }
@@ -340,6 +354,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       myGlobalKey: _myGlobalKey,
                       timestamp: _messages[index].timestamp,
                       showDate: _messages[index].showDate,
+                      showTime: _messages[index].showTime,
                     );
                   },
                 ),
@@ -421,6 +436,7 @@ class ChatBubble extends StatelessWidget {
   final GlobalKey<AnimatedListState>? listKey;
   final int timestamp;
   final bool showDate;
+  final bool showTime;
 
   const ChatBubble({
     Key? key,
@@ -431,6 +447,7 @@ class ChatBubble extends StatelessWidget {
     required this.listKey,
     required this.timestamp,
     required this.showDate,
+    required this.showTime,
   }) : super(key: key);
 
   @override
@@ -497,14 +514,15 @@ class ChatBubble extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                Text(
-                  DateFormat('h:mm a').format(
-                      DateTime.fromMillisecondsSinceEpoch(timestamp * 1000)),
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 10,
+                if (showTime)
+                  Text(
+                    DateFormat('h:mm a').format(
+                        DateTime.fromMillisecondsSinceEpoch(timestamp * 1000)),
+                    style: const TextStyle(
+                      color: Colors.grey,
+                      fontSize: 10,
+                    ),
                   ),
-                ),
                 Row(
                   mainAxisAlignment:
                       isSent ? MainAxisAlignment.end : MainAxisAlignment.start,
