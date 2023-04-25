@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import '../utils/nostr.dart';
 import '../utils/messages.dart';
@@ -19,8 +20,6 @@ import './friends_list_page.dart';
 bool needsMessageUpdate = false;
 
 final _lock = Lock();
-
-bool _userScrolling = false;
 
 class ChatPage extends StatefulWidget {
   final String friendName;
@@ -79,6 +78,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _handleNotification();
     WidgetsBinding.instance.addObserver(this);
     _displayMessages(widget.sharedKey, widget.friendIndex);
     _getGlobalKey().then((value) {
@@ -91,6 +91,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _myGlobalKey = value;
       });
     });
+  }
+
+  Future<void> _handleNotification() async {
+    // Get any notification that was used to open the app
+    final NotificationAppLaunchDetails? notificationAppLaunchDetails =
+        await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
+
+    if (notificationAppLaunchDetails != null &&
+        notificationAppLaunchDetails.payload != null) {
+      // If a notification was used to open the app, extract the friend index from the payload
+      final int friendIndex = int.parse(notificationAppLaunchDetails.payload!);
+      // Navigate to the ChatPage with the specified friend index
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => ChatPage(
+          friendName: widget.friendName,
+          sharedKey: widget.sharedKey,
+          friendIndex: friendIndex,
+        ),
+      ));
+    }
   }
 
   Future<void> _getImage(ImageSource source) async {

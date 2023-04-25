@@ -40,6 +40,7 @@ dependencies:
   url_launcher: ^6.1.10
   email_launcher: ^1.1.1
   flutter_email_sender: ^5.2.0
+  flutter_local_notifications: ^8.2.0
 
 dev_dependencies:
   flutter_test:

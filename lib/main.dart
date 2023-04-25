@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class SharedPreferencesHelper {
   static final SharedPreferencesHelper _instance =
@@ -18,8 +19,26 @@ class SharedPreferencesHelper {
   }
 }
 
+Future onNotificationClick(String? payload) async {
+  print('Notification clicked with payload: $payload');
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const IOSInitializationSettings initializationSettingsIOS =
+      IOSInitializationSettings();
+  const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid, iOS: initializationSettingsIOS);
+  await flutterLocalNotificationsPlugin.initialize(
+    initializationSettings,
+    onSelectNotification: onNotificationClick,
+  );
+
   await SharedPreferencesHelper().init();
   runApp(const MyApp());
 }

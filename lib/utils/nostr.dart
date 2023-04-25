@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:nostr/nostr.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import './location.dart';
 import './friends.dart';
 import './messages.dart';
@@ -41,6 +42,8 @@ String eventSig = '';
 
 bool successfulPost = false;
 
+final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
 List<bool> isConnected = List<bool>.empty(growable: true);
 
 Future<void> connectWebSocket() async {
@@ -66,7 +69,6 @@ Future<void> connectWebSocket() async {
           isConnected[i] = true;
           webSockets[i]!.listen((event) async {
             if (event.contains('EVENT')) {
-              //print(event);
               String currentEventSig = getEventSig(event);
               if (currentEventSig != eventSig) {
                 eventSig = currentEventSig;
@@ -168,6 +170,13 @@ Future<void> connectWebSocket() async {
                           }
                           needsUpdate = true;
                         } else if (content['type'] == 'message') {
+                          final List<String> friendInfo =
+                              await getFriendInfo(pubKey);
+                          final String friendName = friendInfo[0];
+                          final int friendIndex =
+                              int.tryParse(friendInfo[1]) ?? -1;
+                          _displayNotification(
+                              friendName, 'Message', friendIndex);
                           if (content['image'] != null) {
                             await addReceivedImage(
                                 pubKey, globalKey, content['image'], timestamp);
@@ -363,4 +372,26 @@ String decrypt(String privateKey, String encryptedContent) {
   final encrypted = Encrypted(encryptedBytes);
   final decrypter = Encrypter(AES(key, mode: AESMode.cbc));
   return decrypter.decrypt(encrypted, iv: iv);
+}
+
+Future<void> _displayNotification(
+    String title, String message, int index) async {
+  const AndroidNotificationDetails androidPlatformChannelSpecifics =
+      AndroidNotificationDetails(
+          'your channel id', 'your channel name', 'your channel description',
+          importance: Importance.max,
+          priority: Priority.high,
+          ticker: 'ticker');
+  const IOSNotificationDetails iOSPlatformChannelSpecifics =
+      IOSNotificationDetails();
+  const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: iOSPlatformChannelSpecifics);
+  await flutterLocalNotificationsPlugin.show(
+    0, // Notification ID
+    title, // Notification title
+    message, // Notification message
+    platformChannelSpecifics, // Notification details
+    payload: index.toString(),
+  );
 }

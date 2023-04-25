@@ -21,6 +21,24 @@ Future<List<String>> loadFriends() async {
   return friendsList;
 }
 
+Future<List<String>> getFriendInfo(String pubKey) async {
+  SharedPreferences prefs = SharedPreferencesHelper().prefs;
+  List<String> friendsList = [];
+
+  friendsList = prefs.getStringList('friends') ?? [];
+
+  int index = friendsList.indexWhere(
+      (friend) => getPublicKey(jsonDecode(friend)['privateKey']) == pubKey);
+
+  if (index != -1) {
+    final String friendName = jsonDecode(friendsList[index])['name'];
+    final String privKey = jsonDecode(friendsList[index])['privateKey'];
+    return [friendName, index.toString(), privKey];
+  }
+
+  return ['', '-1', ''];
+}
+
 Future<bool> addFriend(String rawData, String? photoPath) async {
   final Map<String, dynamic> friendData = jsonDecode(rawData);
 

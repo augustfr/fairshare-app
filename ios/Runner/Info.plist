@@ -4,6 +4,16 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIUserNotificationSettings</key>
+	<array>
+		<string>UIUserNotificationTypeAlert</string>
+		<string>UIUserNotificationTypeBadge</string>
+		<string>UIUserNotificationTypeSound</string>
+	</array>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>Notifications are used for when your friends message you and the app hasn't fully quit yet.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

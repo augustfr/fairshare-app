@@ -215,7 +215,6 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _processImport(BuildContext context, String jsonData) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-    print(prefs.getString('user_name'));
     // Show loading dialog
     showDialog(
       context: context,
