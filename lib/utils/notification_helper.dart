@@ -5,9 +5,9 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 Future<void> displayNotification(
     String title, String message, int index) async {
-  print('received');
   const AndroidNotificationDetails androidPlatformChannelSpecifics =
-      AndroidNotificationDetails('your_channel_id', 'your_channel_name',
+      AndroidNotificationDetails('com.example.FairShare.message_notifications',
+          'Message Notifications',
           importance: Importance.max,
           priority: Priority.high,
           showWhen: true,
