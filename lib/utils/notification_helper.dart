@@ -3,6 +3,25 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
+Future onNotificationClick(String? payload) async {
+  print('Notification clicked with payload: $payload');
+}
+
+Future<void> initializeNotifications() async {
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const IOSInitializationSettings initializationSettingsIOS =
+      IOSInitializationSettings();
+  const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid, iOS: initializationSettingsIOS);
+  await flutterLocalNotificationsPlugin.initialize(
+    initializationSettings,
+    onSelectNotification: onNotificationClick,
+  );
+}
+
 Future<void> displayNotification(
     String title, String message, int index) async {
   const AndroidNotificationDetails androidPlatformChannelSpecifics =
