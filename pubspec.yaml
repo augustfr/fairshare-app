@@ -15,10 +15,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.2
   flutter_lints: ^1.0.0
   google_maps_flutter: ^2.0.11
-  custom_info_window: ^1.0.1
   location: ^4.3.0
   mobile_scanner: ^3.2.0
   flutter_vibrate: ^1.3.0
@@ -37,8 +35,6 @@ dependencies:
   flutter_native_image: ^0.0.6+1
   share: ^2.0.4
   intl: ^0.18.1
-  url_launcher: ^6.1.10
-  email_launcher: ^1.1.1
   flutter_email_sender: ^5.2.0
   flutter_local_notifications: ^8.2.0
 
