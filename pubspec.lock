@@ -158,14 +158,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_config:
+  flutter_config_plus:
     dependency: "direct main"
     description:
-      name: flutter_config
-      sha256: "8e2be2d560a52e06d2ef53a31913a11fc80ef708a442571c96194fd32e29fb1a"
+      name: flutter_config_plus
+      sha256: aaacb29778db1f66245a1f1bf5aeb3e934d1cb707eee080c342edab8f06333bf
       url: "https://pub.dev"
     source: hosted
-    version: "2.0.0"
+    version: "1.1.1"
   flutter_email_sender:
     dependency: "direct main"
     description:

@@ -1,6 +1,6 @@
 PODS:
   - Flutter (1.0.0)
-  - flutter_config (0.0.1):
+  - flutter_config_plus (0.0.1):
     - Flutter
   - flutter_email_sender (0.0.1):
     - Flutter
@@ -115,7 +115,7 @@ PODS:
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
-  - flutter_config (from `.symlinks/plugins/flutter_config/ios`)
+  - flutter_config_plus (from `.symlinks/plugins/flutter_config_plus/ios`)
   - flutter_email_sender (from `.symlinks/plugins/flutter_email_sender/ios`)
   - flutter_image_compress (from `.symlinks/plugins/flutter_image_compress/ios`)
   - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
@@ -153,8 +153,8 @@ SPEC REPOS:
 EXTERNAL SOURCES:
   Flutter:
     :path: Flutter
-  flutter_config:
-    :path: ".symlinks/plugins/flutter_config/ios"
+  flutter_config_plus:
+    :path: ".symlinks/plugins/flutter_config_plus/ios"
   flutter_email_sender:
     :path: ".symlinks/plugins/flutter_email_sender/ios"
   flutter_image_compress:
@@ -184,7 +184,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: f04841e97a9d0b0a8025694d0796dd46242b2854
-  flutter_config: 2226c1df19c78fe34a05eb7f1363445f18e76fc1
+  flutter_config_plus: 2df4781de772ac3c0d253ae6122a8396ec306e35
   flutter_email_sender: 02d7443217d8c41483223627972bfdc09f74276b
   flutter_image_compress: 5a5e9aee05b6553048b8df1c3bc456d0afaac433
   flutter_local_notifications: 0c0b1ae97e741e1521e4c1629a459d04b9aec743
