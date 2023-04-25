@@ -36,7 +36,7 @@ dependencies:
   share: ^2.0.4
   intl: ^0.18.1
   flutter_email_sender: ^5.2.0
-  flutter_local_notifications: ^8.2.0
+  flutter_local_notifications: ^9.1.2
 
 dev_dependencies:
   flutter_test:

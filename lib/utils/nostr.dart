@@ -17,6 +17,7 @@ import 'package:tuple/tuple.dart';
 import '../pages/qr_scanner.dart';
 import '../main.dart';
 import '../utils/debug_helper.dart';
+import '../utils/notification_helper.dart';
 
 List<String> defaultRelays = [
   'wss://nostr.fairshare.social',
@@ -175,7 +176,7 @@ Future<void> connectWebSocket() async {
                           final String friendName = friendInfo[0];
                           final int friendIndex =
                               int.tryParse(friendInfo[1]) ?? -1;
-                          _displayNotification(
+                          displayNotification(
                               friendName, 'Message', friendIndex);
                           if (content['image'] != null) {
                             await addReceivedImage(
@@ -372,26 +373,4 @@ String decrypt(String privateKey, String encryptedContent) {
   final encrypted = Encrypted(encryptedBytes);
   final decrypter = Encrypter(AES(key, mode: AESMode.cbc));
   return decrypter.decrypt(encrypted, iv: iv);
-}
-
-Future<void> _displayNotification(
-    String title, String message, int index) async {
-  const AndroidNotificationDetails androidPlatformChannelSpecifics =
-      AndroidNotificationDetails(
-          'your channel id', 'your channel name', 'your channel description',
-          importance: Importance.max,
-          priority: Priority.high,
-          ticker: 'ticker');
-  const IOSNotificationDetails iOSPlatformChannelSpecifics =
-      IOSNotificationDetails();
-  const NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      iOS: iOSPlatformChannelSpecifics);
-  await flutterLocalNotificationsPlugin.show(
-    0, // Notification ID
-    title, // Notification title
-    message, // Notification message
-    platformChannelSpecifics, // Notification details
-    payload: index.toString(),
-  );
 }
