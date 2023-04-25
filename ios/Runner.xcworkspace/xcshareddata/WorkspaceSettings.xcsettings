@@ -4,5 +4,12 @@
 <dict>
 	<key>PreviewsEnabled</key>
 	<false/>
+	<key>PrebuildScripts</key>
+    <array>
+        <dict>
+            <key>ShellScript</key>
+            <string>cp ${PROJECT_DIR}/../.env ${PROJECT_DIR}/.env</string>
+        </dict>
+    </array>
 </dict>
 </plist>

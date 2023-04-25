@@ -4,12 +4,35 @@ import GoogleMaps
 
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-  ) -> Bool {
-    GMSServices.provideAPIKey("AIzaSyAtl5kf2_vWNhS2uE1H6UUGWjlSvsGBAbU")
-    GeneratedPluginRegistrant.register(with: self)
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
+    private var apiKey: String?
+
+    override func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        let controller: FlutterViewController = window?.rootViewController as! FlutterViewController
+        let mapsApiKeyChannel = FlutterMethodChannel(name: "mapsApiKeyChannel", binaryMessenger: controller.binaryMessenger)
+        mapsApiKeyChannel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
+            guard call.method == "setApiKey" else {
+                result(FlutterMethodNotImplemented)
+                return
+            }
+
+            self?.handleSetApiKey(call, result: result)
+        }
+
+        GeneratedPluginRegistrant.register(with: self)
+        return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
+
+    private func handleSetApiKey(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        if let arguments = call.arguments as? [String: Any],
+           let apiKey = arguments["apiKey"] as? String {
+            self.apiKey = apiKey
+            GMSServices.provideAPIKey(apiKey)
+            result(nil)
+        } else {
+            result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid or missing arguments", details: nil))
+        }
+    }
 }
