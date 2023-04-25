@@ -25,8 +25,8 @@ Future<void> initializeNotifications() async {
 Future<void> displayNotification(
     String title, String message, int index) async {
   const AndroidNotificationDetails androidPlatformChannelSpecifics =
-      AndroidNotificationDetails('com.example.FairShare.message_notifications',
-          'Message Notifications',
+      AndroidNotificationDetails(
+          'com.august.FairShare.message_notifications', 'Message Notifications',
           importance: Importance.max,
           priority: Priority.high,
           showWhen: true,

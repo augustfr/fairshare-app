@@ -93,7 +93,7 @@ BEGIN
             VALUE "FileDescription", "demo_with_friends" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "demo_with_friends" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2023 com.example. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2023 com.august. All rights reserved." "\0"
             VALUE "OriginalFilename", "demo_with_friends.exe" "\0"
             VALUE "ProductName", "demo_with_friends" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

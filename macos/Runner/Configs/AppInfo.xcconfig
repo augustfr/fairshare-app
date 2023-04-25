@@ -8,7 +8,7 @@
 PRODUCT_NAME = demo_with_friends
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.demoWithFriends
+PRODUCT_BUNDLE_IDENTIFIER = com.august.demoWithFriends
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2023 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2023 com.august. All rights reserved.
