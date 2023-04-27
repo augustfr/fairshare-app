@@ -1,20 +1,23 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui' as ui;
 import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synchronized/synchronized.dart';
-import '../models/map_style.dart';
+
 import './friends_list_page.dart';
 import './qr_scanner.dart';
-import '../utils/nostr.dart';
+import '../main.dart';
+import '../models/map_style.dart';
 import '../utils/friends.dart';
 import '../utils/location.dart';
-import '../main.dart';
+import '../utils/nostr.dart';
+import '../utils/notification_helper.dart';
 
 final _lock = Lock();
 
@@ -153,6 +156,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     _loadSwitchValue();
+    _initializeNotification();
     WidgetsBinding.instance.addObserver(this);
     _initialCameraPosition = _getCurrentLocation();
     _checkFirstTimeUser();
@@ -164,6 +168,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
     });
     _initializeAsyncDependencies();
+  }
+
+  Future<void> _initializeNotification() async {
+    await initializeNotifications(context);
   }
 
   Future<void> _initializeAsyncDependencies() async {

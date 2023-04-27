@@ -1,13 +1,44 @@
+import 'dart:convert';
+
+import 'package:fairshare/pages/chat_page.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-    FlutterLocalNotificationsPlugin();
+import 'friends.dart';
 
-Future onNotificationClick(String? payload) async {
-  print('Notification clicked with payload: $payload');
+Future onNotificationClick(BuildContext context, String? payload) async {
+  if (payload == null) {
+    return;
+  }
+  final friendIndex = int.parse(payload);
+  List<String> friendsList = await loadFriends();
+  if (friendsList.isEmpty) {
+    return;
+  }
+
+  if (friendsList.length < friendIndex + 1) {
+    return;
+  }
+
+  final friend = friendsList[friendIndex];
+  Map<String, dynamic> decodedFriend =
+      jsonDecode(friend) as Map<String, dynamic>;
+  String name = decodedFriend['name'];
+  String privateKey = decodedFriend['privateKey'];
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ChatPage(
+        friendName: name,
+        sharedKey: privateKey,
+        friendIndex: friendIndex,
+      ),
+    ),
+  );
 }
 
-Future<void> initializeNotifications() async {
+Future<void> initializeNotifications(BuildContext context) async {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   const AndroidInitializationSettings initializationSettingsAndroid =
@@ -18,12 +49,15 @@ Future<void> initializeNotifications() async {
       android: initializationSettingsAndroid, iOS: initializationSettingsIOS);
   await flutterLocalNotificationsPlugin.initialize(
     initializationSettings,
-    onSelectNotification: onNotificationClick,
+    onSelectNotification: (String? payload) =>
+        onNotificationClick(context, payload),
   );
 }
 
 Future<void> displayNotification(
     String title, String message, int index) async {
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
   const AndroidNotificationDetails androidPlatformChannelSpecifics =
       AndroidNotificationDetails(
           'com.august.FairShare.message_notifications', 'Message Notifications',

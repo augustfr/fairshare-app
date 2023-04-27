@@ -1,21 +1,23 @@
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:intl/intl.dart';
-import '../utils/nostr.dart';
-import '../utils/messages.dart';
-import 'package:synchronized/synchronized.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter_native_image/flutter_native_image.dart';
-import 'package:path/path.dart' as path;
 import 'package:image/image.dart' as img;
-import './home_page.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:path/path.dart' as path;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:synchronized/synchronized.dart';
+
 import './friends_list_page.dart';
+import './home_page.dart';
+import '../utils/messages.dart';
+import '../utils/nostr.dart';
 
 bool needsMessageUpdate = false;
 

@@ -1,21 +1,23 @@
-import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:encrypt/encrypt.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:nostr/nostr.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import './location.dart';
-import './friends.dart';
-import './messages.dart';
-import '../pages/chat_page.dart';
-import '../pages/home_page.dart';
-import '../pages/friends_list_page.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:encrypt/encrypt.dart';
 import 'package:tuple/tuple.dart';
-import '../pages/qr_scanner.dart';
+
+import './friends.dart';
+import './location.dart';
+import './messages.dart';
 import '../main.dart';
+import '../pages/chat_page.dart';
+import '../pages/friends_list_page.dart';
+import '../pages/home_page.dart';
+import '../pages/qr_scanner.dart';
 import '../utils/debug_helper.dart';
 import '../utils/notification_helper.dart';
 
@@ -186,6 +188,7 @@ Future<void> connectWebSocket() async {
                             await addReceivedMessage(
                                 pubKey, content['globalKey'], text, timestamp);
                           }
+
                           needsMessageUpdate = true;
                           needsUpdate = true;
                           needsChatListUpdate = true;

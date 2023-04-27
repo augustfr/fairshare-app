@@ -1,9 +1,9 @@
-import 'package:fairshare/utils/notification_helper.dart';
 import 'package:flutter/material.dart';
-import 'pages/home_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_config_plus/flutter_config_plus.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_config_plus/flutter_config_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'pages/home_page.dart';
 
 void sendApiKeyToNative() {
   const platform = MethodChannel('mapsApiKeyChannel');
@@ -31,7 +31,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FlutterConfigPlus.loadEnvVariables();
   sendApiKeyToNative();
-  await initializeNotifications();
   await SharedPreferencesHelper().init();
   runApp(const MyApp());
 }
