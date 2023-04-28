@@ -1,18 +1,20 @@
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import '../utils/nostr.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../main.dart';
 import '../utils/friends.dart';
 import '../utils/location.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:path/path.dart' as path;
-import '../main.dart';
+import '../utils/nostr.dart';
 
 Duration loopTime = const Duration(seconds: 10);
 
@@ -172,7 +174,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
           "globalKey": globalKey
         };
         String jsonString = json.encode(jsonMap);
-        bool added = await addFriend(jsonString, photoPath);
+        bool added = await addFriend(context, jsonString, photoPath);
 
         if (added) {
           widget.onQRScanSuccess();
@@ -243,7 +245,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
     }
 
     final pickedFile = await picker.pickImage(
-      source: ImageSource.camera,
+      source: ImageSource.gallery,
       preferredCameraDevice: cameraDevice,
     );
     if (pickedFile == null) {

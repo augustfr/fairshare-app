@@ -1,26 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui' as ui;
-import 'dart:typed_data';
+
+import 'package:fairshare/providers/friend.dart';
+import 'package:fairshare/utils/extensions.dart';
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synchronized/synchronized.dart';
-import '../models/map_style.dart';
+
 import './friends_list_page.dart';
 import './qr_scanner.dart';
-import '../utils/nostr.dart';
+import '../main.dart';
+import '../models/map_style.dart';
 import '../utils/friends.dart';
 import '../utils/location.dart';
-import '../main.dart';
+import '../utils/nostr.dart';
+import '../utils/notification_helper.dart';
 
 final _lock = Lock();
-
-bool needsUpdate = false;
-
-Set<int> unreadMessageIndexes = {};
 
 bool switchValue = true; // true when user wants to be sending location
 
@@ -31,19 +31,18 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+class _HomePageState extends State<HomePage>
+    with WidgetsBindingObserver, AfterLayoutMixin {
   GoogleMapController? _controller;
-  Timer? _timer;
-
-  final Set<Marker> _markers = {};
 
   LatLng myCurrentLocation = const LatLng(0.0, 0.0);
 
-  List<String> friendsList = [];
-
-  late Future<CameraPosition> _initialCameraPosition;
+  CameraPosition initialCameraPosition =
+      CameraPosition(target: LatLng(0, 0), zoom: 14.4746);
 
   StreamSubscription<LocationData>? _locationSubscription;
+
+  FriendProvider? friendProvider;
 
   void _showGhostModePopup(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -111,7 +110,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> sendLocationUpdate() async {
-    friendsList = await loadFriends();
+    List<Map<String, dynamic>> friendsList = friendProvider!.friends;
     SharedPreferences prefs = SharedPreferencesHelper().prefs;
 
     String globalKey = prefs.getString('global_key') ?? '';
@@ -119,9 +118,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         parseLatLngFromString(myCurrentLocation.toString());
     if (currentLocationString[0] != 0.0 && currentLocationString[1] != 0.0) {
       for (final friend in friendsList) {
-        Map<String, dynamic> decodedFriend =
-            jsonDecode(friend) as Map<String, dynamic>;
-        String sharedKey = decodedFriend['privateKey'];
+        String sharedKey = friend['privateKey'];
         final content = jsonEncode({
           'type': 'locationUpdate',
           'currentLocation': myCurrentLocation.toString(),
@@ -153,17 +150,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     _loadSwitchValue();
+    _initializeNotification();
     WidgetsBinding.instance.addObserver(this);
-    _initialCameraPosition = _getCurrentLocation();
+    _getCurrentLocation();
     _checkFirstTimeUser();
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _subscribeToLocationUpdates());
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (needsUpdate) {
-        _updateFriendsOnMapAndNotifications();
-      }
-    });
     _initializeAsyncDependencies();
+  }
+
+  @override
+  void afterFirstLayout(BuildContext context) {
+    friendProvider = Provider.of<FriendProvider>(context, listen: false);
+    friendProvider!.load();
+  }
+
+  Future<void> _initializeNotification() async {
+    await initializeNotifications(context);
   }
 
   Future<void> _initializeAsyncDependencies() async {
@@ -172,32 +175,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (relays.isEmpty) {
       prefs.setStringList('relays', defaultRelays);
     }
-    await connectWebSocket();
+    await connectWebSocket(context);
     await cleanLocalStorage();
     await _fetchAndUpdateData();
-    await _updateFriendsOnMapAndNotifications();
     if (switchValue) {
       await sendLocationUpdate();
     }
   }
 
-  Future<void> _updateFriendsOnMapAndNotifications() async {
-    friendsList = await loadFriends();
-    await addFriendsToMap(friendsList);
-    unreadMessageIndexes = (await checkForUnreadMessages(friendsList)).toSet();
-    needsUpdate = false;
-  }
-
   @override
   void dispose() {
-    _timer?.cancel();
     _locationSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   // Method to get current location
-  Future<CameraPosition> _getCurrentLocation() async {
+  Future<void> _getCurrentLocation() async {
     final latLng = await getCurrentLocation();
 
     // Save current location in SharedPreferences
@@ -205,8 +199,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     await prefs.setDouble('current_latitude', latLng.latitude);
     await prefs.setDouble('current_longitude', latLng.longitude);
-
-    return CameraPosition(target: latLng, zoom: 14.4746);
+    setState(() {
+      initialCameraPosition = CameraPosition(target: latLng, zoom: 14.4746);
+    });
   }
 
   Future<void> _checkFirstTimeUser() async {
@@ -223,75 +218,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  Future<BitmapDescriptor> _createCircleMarkerIcon(
-      Color color, double circleRadius) async {
-    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
-    final Canvas canvas = Canvas(pictureRecorder);
-    final Paint paint = Paint()..color = color;
-    final double radius = circleRadius;
-
-    canvas.drawCircle(Offset(radius, radius), radius, paint);
-
-    final ui.Image image = await pictureRecorder
-        .endRecording()
-        .toImage((radius * 2).toInt(), (radius * 2).toInt());
-    final ByteData? byteData =
-        await image.toByteData(format: ui.ImageByteFormat.png);
-
-    return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
-  }
-
-  Future<void> addFriendsToMap(friendsList) async {
-    BitmapDescriptor customMarkerIcon =
-        await _createCircleMarkerIcon(Colors.red, 20);
-    Set<Marker> updatedMarkers = {};
-
-    for (var friendJson in friendsList) {
-      Map<String, dynamic> friendData = jsonDecode(friendJson);
-      String? friendName = friendData['name'];
-      final friendLocation = friendData['currentLocation'];
-
-      if (friendLocation != null) {
-        List<double> currentLocation =
-            parseLatLngFromString(friendData['currentLocation']);
-        double latitude = currentLocation[0];
-        double longitude = currentLocation[1];
-        updatedMarkers.add(
-          Marker(
-            markerId: MarkerId(friendName ?? 'Anonymous'),
-            position: LatLng(latitude, longitude),
-            infoWindow: InfoWindow(title: friendName ?? 'Anonymous'),
-            icon: customMarkerIcon,
-          ),
-        );
-      }
-    }
-
-    // Update the _markers set with the updated markers
-    setState(() {
-      _markers.clear();
-      _markers.addAll(updatedMarkers);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          FutureBuilder<CameraPosition>(
-            future: _initialCameraPosition,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+          Consumer<FriendProvider>(
+            builder: (context, friend, child) {
+              if (friend.isLoading) {
                 return const Center(child: CircularProgressIndicator());
               }
-
               return Stack(
                 children: [
                   GoogleMap(
-                    initialCameraPosition: snapshot.data!,
+                    initialCameraPosition: initialCameraPosition,
                     myLocationEnabled: true,
-                    markers: _markers, // Add this line to include markers
+                    markers:
+                        friend.mapMarkers, // Add this line to include markers
                     onMapCreated: (GoogleMapController controller) {
                       _controller = controller;
                       _controller!.setMapStyle(MapStyle().dark);
@@ -322,7 +265,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       child: Stack(
                         children: [
                           const Icon(Icons.menu, color: Colors.black),
-                          if (unreadMessageIndexes.isNotEmpty)
+                          if (friend.unreadMessageIndexes.isNotEmpty)
                             Positioned(
                               top: 0,
                               right: 0,

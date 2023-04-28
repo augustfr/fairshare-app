@@ -1,22 +1,21 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:async';
 
+import 'package:fairshare/providers/friend.dart';
+import 'package:fairshare/utils/extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:synchronized/synchronized.dart';
 import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:synchronized/synchronized.dart';
 
 import './chat_page.dart';
 import './profile_page.dart';
-import '../utils/friends.dart';
-import '../utils/location.dart';
-import '../utils/nostr.dart';
-import './home_page.dart';
 import '../main.dart';
+import '../utils/friends.dart';
 
 final _lock = Lock();
 
@@ -29,62 +28,24 @@ class FriendsListPage extends StatefulWidget {
   _FriendsListPageState createState() => _FriendsListPageState();
 }
 
-class _FriendsListPageState extends State<FriendsListPage> {
-  final StreamController<List<Map<String, dynamic>>> _friendsStreamController =
-      StreamController<List<Map<String, dynamic>>>.broadcast();
-  Timer? _timer;
-
-  Future<void> _handleRefresh() async {
-    await _loadFriends();
-  }
+class _FriendsListPageState extends State<FriendsListPage>
+    with AfterLayoutMixin {
+  FriendProvider? friendProvider;
 
   @override
   void initState() {
     super.initState();
-    _loadFriends();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (needsChatListUpdate) {
-        _loadFriends();
-        needsChatListUpdate = false;
-      }
-    });
+  }
+
+  @override
+  void afterFirstLayout(BuildContext context) {
+    friendProvider = Provider.of<FriendProvider>(context, listen: false);
+    friendProvider!.load();
   }
 
   @override
   void dispose() {
-    _friendsStreamController.close();
-    _timer?.cancel();
     super.dispose();
-  }
-
-  Future<List<Future<Map<String, dynamic>>>> _updateFriendsList() async {
-    List<String> friendsList = await loadFriends();
-    LatLng savedLocation = await getSavedLocation();
-    List<Future<Map<String, dynamic>>> updatedFriendsFutures =
-        friendsList.map((friend) async {
-      Map<String, dynamic> decodedFriend =
-          jsonDecode(friend) as Map<String, dynamic>;
-      List<double> currentLocation =
-          parseLatLngFromString(decodedFriend['currentLocation']);
-      double latitude = currentLocation[0];
-      double longitude = currentLocation[1];
-      LatLng friendLatLng = LatLng(latitude, longitude);
-      double distance = getDistance(savedLocation, friendLatLng);
-      String distanceString = distance.toString() + 'm';
-      decodedFriend['distance'] = distanceString;
-      String pubKey = getPublicKey(decodedFriend['privateKey']);
-      int? latestLocationUpdate = await getLatestLocationUpdate(pubKey);
-      int currentTime = DateTime.now().millisecondsSinceEpoch;
-      int secondsTimestamp = (currentTime / 1000).round();
-      if (latestLocationUpdate != null) {
-        int timeElapsed = secondsTimestamp - latestLocationUpdate;
-        decodedFriend['timeElapsed'] = timeElapsed;
-      }
-
-      return decodedFriend;
-    }).toList();
-
-    return updatedFriendsFutures;
   }
 
   String formatDuration(int? timeElapsed) {
@@ -106,24 +67,14 @@ class _FriendsListPageState extends State<FriendsListPage> {
     }
   }
 
-  Future<void> _loadFriends() async {
-    List<Map<String, dynamic>> updatedFriends =
-        await Future.wait(await _updateFriendsList());
-    _friendsStreamController.add(updatedFriends);
-  }
-
   Future<void> _removeFriend(int index) async {
-    await removeFriend(index);
-    List<Map<String, dynamic>> friendsList =
-        await Future.wait(await _updateFriendsList());
-    _friendsStreamController.add(friendsList);
+    await removeFriend(context, index);
+    friendProvider?.load();
   }
 
   Future<void> _showEditNameDialog(int index) async {
-    List<Map<String, dynamic>> friendsList =
-        await Future.wait(await _updateFriendsList());
     TextEditingController nameController =
-        TextEditingController(text: friendsList[index]['name']);
+        TextEditingController(text: friendProvider?.friends[index]['name']);
 
     return showDialog<void>(
       context: context,
@@ -197,14 +148,13 @@ class _FriendsListPageState extends State<FriendsListPage> {
   Future<void> _selectNewPhoto(int index) async {
     final ImagePicker _picker = ImagePicker();
     final XFile? pickedFile = await _picker.pickImage(
-      source: ImageSource.camera,
+      source: ImageSource.gallery,
       preferredCameraDevice: CameraDevice.rear,
       maxWidth: 800,
       maxHeight: 800,
     );
     if (pickedFile != null) {
-      final List<Map<String, dynamic>> friendsList =
-          await Future.wait(await _updateFriendsList());
+      final List<Map<String, dynamic>> friendsList = friendProvider!.friends;
       final Directory directory = await getApplicationDocumentsDirectory();
       final String? existingPath = friendsList[index]['photoPath'] ?? '';
       final String newFileName = path.basename(pickedFile.path);
@@ -223,7 +173,6 @@ class _FriendsListPageState extends State<FriendsListPage> {
 
       // Update the friends list
       friendsList[index]['photoPath'] = newPath;
-      _friendsStreamController.add(friendsList);
 
       // Save the updated friends list to SharedPreferences
       await _lock.synchronized(() async {
@@ -242,20 +191,22 @@ class _FriendsListPageState extends State<FriendsListPage> {
           await existingFile.delete();
         }
       }
+
+      friendProvider?.load(showLoading: false);
     }
   }
 
   Future<void> _selectNewName(int index, String name) async {
-    List<Map<String, dynamic>> friendsList =
-        await Future.wait(await _updateFriendsList());
+    List<Map<String, dynamic>> friendsList = friendProvider!.friends;
     friendsList[index]['name'] = name;
-    _friendsStreamController.add(friendsList);
 
     await _lock.synchronized(() async {
       SharedPreferences prefs = SharedPreferencesHelper().prefs;
       await prefs.setStringList(
           'friends', friendsList.map((friend) => jsonEncode(friend)).toList());
     });
+
+    friendProvider?.load(showLoading: false);
   }
 
   Future<void> _showConfirmNewPhotoDialog(int index) async {
@@ -293,100 +244,95 @@ class _FriendsListPageState extends State<FriendsListPage> {
           children: [
             Padding(
               padding: const EdgeInsets.only(top: 50),
-              child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: _friendsStreamController.stream,
-                builder: (BuildContext context,
-                    AsyncSnapshot<List<Map<String, dynamic>>> snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting ||
-                      !snapshot.hasData) {
+              child: Consumer<FriendProvider>(
+                builder: (context, friendProvider, child) {
+                  if (friendProvider.isLoading) {
                     return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else {
-                    List<Map<String, dynamic>> friends = snapshot.data!;
-                    return RefreshIndicator(
-                        onRefresh: _handleRefresh,
-                        child: ListView.builder(
-                          itemCount: friends.length,
-                          itemBuilder: (BuildContext context, int index) {
-                            if (friends.isEmpty) {
-                              return const Center(
-                                  child: Text('No friends found.'));
-                            }
-                            Map<String, dynamic> friend = friends[index];
-                            bool hasUnreadMessages =
-                                unreadMessageIndexes.contains(index);
-                            return Dismissible(
-                              key: Key(friend['name']),
-                              direction: DismissDirection.endToStart,
-                              confirmDismiss: (direction) async {
-                                await _showDeleteConfirmationDialog(index);
-                                return false;
-                              },
-                              background: Container(
-                                color: Colors.red,
-                                child: const Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Padding(
-                                    padding: EdgeInsets.only(right: 20.0),
-                                    child:
-                                        Icon(Icons.delete, color: Colors.white),
-                                  ),
+                  }
+                  List<Map<String, dynamic>> friends = friendProvider.friends;
+                  return RefreshIndicator(
+                      onRefresh: () => friendProvider.load(),
+                      child: ListView.builder(
+                        itemCount: friends.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          if (friends.isEmpty) {
+                            return const Center(
+                                child: Text('No friends found.'));
+                          }
+                          Map<String, dynamic> friend = friends[index];
+                          bool hasUnreadMessages = friendProvider
+                              .unreadMessageIndexes
+                              .contains(index);
+                          return Dismissible(
+                            key: Key(friend['name']),
+                            direction: DismissDirection.endToStart,
+                            confirmDismiss: (direction) async {
+                              await _showDeleteConfirmationDialog(index);
+                              return false;
+                            },
+                            background: Container(
+                              color: Colors.red,
+                              child: const Align(
+                                alignment: Alignment.centerRight,
+                                child: Padding(
+                                  padding: EdgeInsets.only(right: 20.0),
+                                  child:
+                                      Icon(Icons.delete, color: Colors.white),
                                 ),
                               ),
-                              child: Stack(
-                                children: [
-                                  ListTile(
-                                    leading: InkWell(
-                                      onTap: () async {
-                                        await _showConfirmNewPhotoDialog(index);
-                                      },
-                                      child: CircleAvatar(
-                                        backgroundImage:
-                                            friend['photoPath'] == null
-                                                ? null
-                                                : FileImage(
-                                                    File(friend['photoPath'])),
-                                      ),
+                            ),
+                            child: Stack(
+                              children: [
+                                ListTile(
+                                  leading: InkWell(
+                                    onTap: () async {
+                                      await _showConfirmNewPhotoDialog(index);
+                                    },
+                                    child: CircleAvatar(
+                                      backgroundImage:
+                                          friend['photoPath'] == null
+                                              ? null
+                                              : FileImage(
+                                                  File(friend['photoPath'])),
                                     ),
-                                    title: Text(friend['name']),
-                                    subtitle: Text(friend['distance'] +
-                                        ' ' +
-                                        formatDuration(friend['timeElapsed'])),
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => ChatPage(
-                                              friendName: friend['name'],
-                                              sharedKey: friend['privateKey'],
-                                              friendIndex: index),
-                                        ),
-                                      );
-                                    },
-                                    onLongPress: () async {
-                                      await _showEditNameDialog(index);
-                                    },
                                   ),
-                                  if (hasUnreadMessages)
-                                    Positioned(
-                                      bottom: 25,
-                                      right: 20,
-                                      child: Align(
-                                        alignment: Alignment.center,
-                                        child: Transform.scale(
-                                          scale: 0.5,
-                                          child: const Icon(Icons.circle,
-                                              color: Colors.red),
-                                        ),
+                                  title: Text(friend['name']),
+                                  subtitle: Text(friend['distance'] +
+                                      ' ' +
+                                      formatDuration(friend['timeElapsed'])),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ChatPage(
+                                            friendName: friend['name'],
+                                            sharedKey: friend['privateKey'],
+                                            friendIndex: index),
+                                      ),
+                                    );
+                                  },
+                                  onLongPress: () async {
+                                    await _showEditNameDialog(index);
+                                  },
+                                ),
+                                if (hasUnreadMessages)
+                                  Positioned(
+                                    bottom: 25,
+                                    right: 20,
+                                    child: Align(
+                                      alignment: Alignment.center,
+                                      child: Transform.scale(
+                                        scale: 0.5,
+                                        child: const Icon(Icons.circle,
+                                            color: Colors.red),
                                       ),
                                     ),
-                                ],
-                              ),
-                            );
-                          },
-                        ));
-                  }
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      ));
                 },
               ),
             ),

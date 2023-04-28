@@ -1,23 +1,24 @@
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:fairshare/providers/chat.dart';
+import 'package:fairshare/utils/extensions.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:intl/intl.dart';
-import '../utils/nostr.dart';
-import '../utils/messages.dart';
-import 'package:synchronized/synchronized.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter_native_image/flutter_native_image.dart';
-import 'package:path/path.dart' as path;
 import 'package:image/image.dart' as img;
-import './home_page.dart';
-import './friends_list_page.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:path/path.dart' as path;
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:synchronized/synchronized.dart';
 
-bool needsMessageUpdate = false;
+import '../utils/messages.dart';
+import '../utils/nostr.dart';
 
 final _lock = Lock();
 
@@ -58,14 +59,15 @@ class Message {
       required this.timestamp});
 }
 
-class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
+class _ChatPageState extends State<ChatPage>
+    with WidgetsBindingObserver, AfterLayoutMixin {
   final TextEditingController _textController = TextEditingController();
-  final List<Message> _messages = [];
-  late Timer _timer;
   String _myGlobalKey = '';
   final ScrollController _scrollController = ScrollController();
   File? _image;
   final _listKey = GlobalKey<AnimatedListState>();
+
+  ChatProvider? chatProvider;
 
   @override
   void didChangeMetrics() {
@@ -78,19 +80,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    _handleNotification();
+
     WidgetsBinding.instance.addObserver(this);
-    _displayMessages(widget.sharedKey, widget.friendIndex);
+    _handleNotification();
     _getGlobalKey().then((value) {
-      _timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
-        if (needsMessageUpdate) {
-          _displayMessages(widget.sharedKey, widget.friendIndex);
-        }
-      });
       setState(() {
         _myGlobalKey = value;
       });
     });
+  }
+
+  @override
+  void afterFirstLayout(BuildContext context) {
+    chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    chatProvider!.init(widget.sharedKey, widget.friendIndex);
+    _displayMessages();
   }
 
   Future<void> _handleNotification() async {
@@ -154,7 +158,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         await postToNostr(widget.sharedKey, content);
         await addSentImage(
             pubKey, globalKey, base64Encode(imageData), secondsTimestamp);
-        await _displayMessages(widget.sharedKey, widget.friendIndex);
+        await _displayMessages();
         _image = null;
       }
     }
@@ -230,72 +234,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _displayMessages(String sharedKey, int index) async {
-    List<Message> fetchedMessages = [];
-    String publicKey = getPublicKey(sharedKey);
-
-    // Fetch messages from SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    String messagesHistoryString = prefs.getString('messagesHistory') ?? '{}';
-    Map<String, dynamic> messagesHistoryMap = jsonDecode(messagesHistoryString);
-    if (messagesHistoryMap.containsKey(publicKey)) {
-      List<dynamic> messagesHistory =
-          messagesHistoryMap[publicKey] as List<dynamic>;
-      DateTime? previousDate;
-      DateTime? previousShownTimestamp;
-
-      for (var message in messagesHistory) {
-        DateTime currentMessageDate =
-            DateTime.fromMillisecondsSinceEpoch(message['timestamp'] * 1000);
-        bool showDate = false;
-        bool showTime = false;
-
-        if (previousDate == null ||
-            currentMessageDate.day != previousDate.day ||
-            currentMessageDate.month != previousDate.month ||
-            currentMessageDate.year != previousDate.year) {
-          showDate = true;
-          showTime = true;
-          previousShownTimestamp = currentMessageDate;
-        }
-
-        if (previousShownTimestamp == null ||
-            currentMessageDate.difference(previousShownTimestamp).inMinutes >=
-                10) {
-          showTime = true;
-          previousShownTimestamp = currentMessageDate;
-        }
-        fetchedMessages.add(Message(
-            type: message['type'], // 'sent' or 'received'
-            media: message['media'] == 'image'
-                ? 'image'
-                : null, // 'image' for images, null for text messages
-            text: message['media'] == 'text'
-                ? message['message']
-                : message['media'] == null
-                    ? message['message']
-                    : null, // set to 'message' if media is null (text message)
-            image: message['media'] == 'image' ? message['image'] : null,
-            globalKey: message['globalKey'],
-            timestamp: message['timestamp'],
-            showDate: showDate, // Set showDate property based on comparison
-            showTime:
-                showTime)); // Set showTime property based on time difference
-
-        previousDate = currentMessageDate;
-      }
-
-      needsMessageUpdate = false;
-    }
-
-    // Sort messages by timestamp
-    fetchedMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    // Clear existing messages and update UI with the fetched messages
-    setState(() {
-      _messages.clear();
-      _messages.addAll(fetchedMessages);
-    });
-
+  Future<void> _displayMessages() async {
+    chatProvider!.load(context);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
@@ -303,20 +243,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         curve: Curves.easeOut,
       );
     });
-    // Update the latestSeenMessage in friendsList
-    if (fetchedMessages.isNotEmpty) {
-      await _lock.synchronized(() async {
-        int latestSeenMessageTimestamp = fetchedMessages.last.timestamp;
-        List<String> friendsList = prefs.getStringList('friends') ?? [];
-        Map<String, dynamic> friendData =
-            jsonDecode(friendsList[widget.friendIndex]) as Map<String, dynamic>;
-        friendData['latestSeenMessage'] = latestSeenMessageTimestamp;
-        friendsList[widget.friendIndex] = json.encode(friendData);
-        await prefs.setStringList('friends', friendsList);
-        needsUpdate = true;
-        needsChatListUpdate = true;
-      });
-    }
   }
 
   Future<String> _getGlobalKey() async {
@@ -340,14 +266,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       String pubKey = getPublicKey(widget.sharedKey);
       await addSentMessage(pubKey, globalKey, text, secondsTimestamp);
       await postToNostr(widget.sharedKey, content);
-      await _displayMessages(widget.sharedKey, widget.friendIndex);
+      await _displayMessages();
     }
   }
 
   @override
   void dispose() {
-    _timer.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    chatProvider?.clear();
     super.dispose();
   }
 
@@ -362,20 +288,25 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           children: [
             Expanded(
               child: NotificationListener<ScrollNotification>(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  itemCount: _messages.length,
-                  addAutomaticKeepAlives: true,
-                  itemBuilder: (BuildContext context, int index) {
-                    return ChatBubble(
-                      listKey: _listKey,
-                      text: _messages[index].text,
-                      image: _messages[index].image,
-                      globalKey: _messages[index].globalKey,
-                      myGlobalKey: _myGlobalKey,
-                      timestamp: _messages[index].timestamp,
-                      showDate: _messages[index].showDate,
-                      showTime: _messages[index].showTime,
+                child: Consumer<ChatProvider>(
+                  builder: (context, chat, child) {
+                    return ListView.builder(
+                      controller: _scrollController,
+                      itemCount: chat.messages.length,
+                      addAutomaticKeepAlives: true,
+                      itemBuilder: (BuildContext context, int index) {
+                        final message = chat.messages[index];
+                        return ChatBubble(
+                          listKey: _listKey,
+                          text: message.text,
+                          image: message.image,
+                          globalKey: message.globalKey,
+                          myGlobalKey: _myGlobalKey,
+                          timestamp: message.timestamp,
+                          showDate: message.showDate,
+                          showTime: message.showTime,
+                        );
+                      },
                     );
                   },
                 ),
