@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:fairshare/providers/friend.dart';
+import 'package:fairshare/utils/extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
@@ -28,15 +29,19 @@ class FriendsListPage extends StatefulWidget {
   _FriendsListPageState createState() => _FriendsListPageState();
 }
 
-class _FriendsListPageState extends State<FriendsListPage> {
+class _FriendsListPageState extends State<FriendsListPage>
+    with AfterLayoutMixin {
   FriendProvider? friendProvider;
 
   @override
   void initState() {
     super.initState();
+  }
 
+  @override
+  void afterFirstLayout(BuildContext context) {
     friendProvider = Provider.of<FriendProvider>(context, listen: false);
-    friendProvider?.load();
+    friendProvider!.load();
   }
 
   @override

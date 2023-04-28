@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:fairshare/providers/chat.dart';
+import 'package:fairshare/utils/extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -58,7 +59,8 @@ class Message {
       required this.timestamp});
 }
 
-class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
+class _ChatPageState extends State<ChatPage>
+    with WidgetsBindingObserver, AfterLayoutMixin {
   final TextEditingController _textController = TextEditingController();
   String _myGlobalKey = '';
   final ScrollController _scrollController = ScrollController();
@@ -79,16 +81,20 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
 
-    chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    chatProvider?.init(widget.sharedKey, widget.friendIndex);
-    _handleNotification();
     WidgetsBinding.instance.addObserver(this);
-    _displayMessages();
+    _handleNotification();
     _getGlobalKey().then((value) {
       setState(() {
         _myGlobalKey = value;
       });
     });
+  }
+
+  @override
+  void afterFirstLayout(BuildContext context) {
+    chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    chatProvider!.init(widget.sharedKey, widget.friendIndex);
+    _displayMessages();
   }
 
   Future<void> _handleNotification() async {
