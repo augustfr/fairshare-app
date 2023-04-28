@@ -3,10 +3,14 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:encrypt/encrypt.dart';
+import 'package:encrypt/encrypt.dart' as encryptor;
+import 'package:fairshare/providers/chat.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:nostr/nostr.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tuple/tuple.dart';
 
@@ -14,7 +18,6 @@ import './friends.dart';
 import './location.dart';
 import './messages.dart';
 import '../main.dart';
-import '../pages/chat_page.dart';
 import '../pages/friends_list_page.dart';
 import '../pages/home_page.dart';
 import '../pages/qr_scanner.dart';
@@ -28,7 +31,6 @@ List<String> defaultRelays = [
 ];
 
 List<WebSocket?> webSockets = List.filled(defaultRelays.length, null);
-Timer? timer;
 
 Map<String, dynamic> addingFriend = {};
 
@@ -49,8 +51,8 @@ final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 List<bool> isConnected = List<bool>.empty(growable: true);
 
-Future<void> connectWebSocket() async {
-  print('Starting');
+Future<void> connectWebSocket(BuildContext context) async {
+  final chatProvider = Provider.of<ChatProvider>(context, listen: false);
   await closeAllWebSockets();
   SharedPreferences prefs = SharedPreferencesHelper().prefs;
   List<String>? relays = prefs.getStringList('relays');
@@ -178,8 +180,6 @@ Future<void> connectWebSocket() async {
                           final String friendName = friendInfo[0];
                           final int friendIndex =
                               int.tryParse(friendInfo[1]) ?? -1;
-                          displayNotification(
-                              friendName, 'Message', friendIndex);
                           if (content['image'] != null) {
                             await addReceivedImage(
                                 pubKey, globalKey, content['image'], timestamp);
@@ -189,9 +189,14 @@ Future<void> connectWebSocket() async {
                                 pubKey, content['globalKey'], text, timestamp);
                           }
 
-                          needsMessageUpdate = true;
                           needsUpdate = true;
                           needsChatListUpdate = true;
+                          if (friendIndex == chatProvider.friendIndex) {
+                            chatProvider.load();
+                          } else {
+                            displayNotification(
+                                friendName, 'Message', friendIndex);
+                          }
                         }
                         await setLatestReceivedEvent(timestamp, pubKey);
                         await setLatestReceivedEventSig(eventSig, pubKey);
@@ -361,19 +366,21 @@ Future<void> postToNostr(String privateKey, String content) async {
 }
 
 String encrypt(String privateKey, String content) {
-  final key = Key.fromUtf8(privateKey.substring(0, 32));
-  final iv = IV.fromLength(16); // Generate a 16-byte IV
-  final encrypter = Encrypter(AES(key, mode: AESMode.cbc));
+  final key = encryptor.Key.fromUtf8(privateKey.substring(0, 32));
+  final iv = encryptor.IV.fromLength(16); // Generate a 16-byte IV
+  final encrypter =
+      encryptor.Encrypter(encryptor.AES(key, mode: encryptor.AESMode.cbc));
   final encrypted = encrypter.encrypt(content, iv: iv);
   return base64.encode(iv.bytes + encrypted.bytes);
 }
 
 String decrypt(String privateKey, String encryptedContent) {
-  final key = Key.fromUtf8(privateKey.substring(0, 32));
+  final key = encryptor.Key.fromUtf8(privateKey.substring(0, 32));
   final encryptedData = base64.decode(encryptedContent);
-  final iv = IV(encryptedData.sublist(0, 16));
+  final iv = encryptor.IV(encryptedData.sublist(0, 16));
   final encryptedBytes = Uint8List.fromList(encryptedData.sublist(16));
-  final encrypted = Encrypted(encryptedBytes);
-  final decrypter = Encrypter(AES(key, mode: AESMode.cbc));
+  final encrypted = encryptor.Encrypted(encryptedBytes);
+  final decrypter =
+      encryptor.Encrypter(encryptor.AES(key, mode: encryptor.AESMode.cbc));
   return decrypter.decrypt(encrypted, iv: iv);
 }

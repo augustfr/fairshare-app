@@ -1,15 +1,17 @@
+import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'package:path_provider/path_provider.dart';
 import 'package:flutter_email_sender/flutter_email_sender.dart';
-import '../utils/nostr.dart';
-import '../utils/friends.dart';
-import '../pages/home_page.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../main.dart';
+import '../pages/home_page.dart';
 import '../utils/debug_helper.dart';
+import '../utils/friends.dart';
+import '../utils/nostr.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -134,7 +136,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     prefs.getStringList('relays') ?? <String>[];
                 relays[index] = newRelayName;
                 await prefs.setStringList('relays', relays);
-                await connectWebSocket();
+                await connectWebSocket(context);
                 setState(() {
                   _relays = relays;
                 });
@@ -148,7 +150,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _refresh() async {
-    await connectWebSocket();
+    await connectWebSocket(context);
     final SharedPreferences prefs = SharedPreferencesHelper().prefs;
     final List<String> relays = prefs.getStringList('relays') ?? <String>[];
     setState(() {
