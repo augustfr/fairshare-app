@@ -1,14 +1,18 @@
-import '../pages/qr_scanner.dart';
-import '../pages/home_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:fairshare/providers/friend.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_vibrate/flutter_vibrate.dart';
-import '../utils/nostr.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synchronized/synchronized.dart';
 import 'package:tuple/tuple.dart';
+
 import './messages.dart';
 import '../main.dart';
+import '../pages/qr_scanner.dart';
+import '../utils/nostr.dart';
 
 final _lock = Lock();
 
@@ -39,7 +43,8 @@ Future<List<String>> getFriendInfo(String pubKey) async {
   return ['', '-1', ''];
 }
 
-Future<bool> addFriend(String rawData, String? photoPath) async {
+Future<bool> addFriend(
+    BuildContext context, String rawData, String? photoPath) async {
   final Map<String, dynamic> friendData = jsonDecode(rawData);
 
   SharedPreferences prefs = SharedPreferencesHelper().prefs;
@@ -79,11 +84,10 @@ Future<bool> addFriend(String rawData, String? photoPath) async {
     await prefs.setString('cycling_pub_key', '');
     await setLatestLocationUpdate(secondsTimestamp, getPublicKey(privateKey));
     scannedPubKey = '';
-    needsUpdate = true;
   });
 
   Vibrate.feedback(FeedbackType.success);
-  needsUpdate = true;
+  Provider.of<FriendProvider>(context, listen: false).load(showLoading: false);
   return true; // Friend added successfully
 }
 
@@ -248,7 +252,7 @@ Future<void> cleanLocalStorage() async {
   });
 }
 
-Future<void> removeFriend(int index) async {
+Future<void> removeFriend(BuildContext context, int index) async {
   await _lock.synchronized(() async {
     SharedPreferences prefs = SharedPreferencesHelper().prefs;
     List<String> friendsList = prefs.getStringList('friends') ?? [];
@@ -265,11 +269,12 @@ Future<void> removeFriend(int index) async {
     await prefs.setStringList('friends', friendsList);
     await removeLatestReceivedEvent(pubKey);
     await clearMessageHistory(pubKey);
-    needsUpdate = true;
+    Provider.of<FriendProvider>(context, listen: false)
+        .load(showLoading: false);
   });
 }
 
-Future<void> removeAllFriends() async {
+Future<void> removeAllFriends(BuildContext context) async {
   SharedPreferences prefs = SharedPreferencesHelper().prefs;
   await _lock.synchronized(() async {
     await prefs.remove('subscribed_keys');
@@ -277,7 +282,7 @@ Future<void> removeAllFriends() async {
     await prefs.remove('latestEventTimestamps');
     await prefs.remove('messagesHistory');
   });
-  needsUpdate = true;
+  Provider.of<FriendProvider>(context, listen: false).load(showLoading: false);
 }
 
 Future<List<int>> checkForUnreadMessages(friendsList) async {
@@ -285,8 +290,7 @@ Future<List<int>> checkForUnreadMessages(friendsList) async {
 
   List<int> friendsWithUnreadMessages = [];
   for (int i = 0; i < friendsList.length; i++) {
-    Map<String, dynamic> decodedFriend =
-        jsonDecode(friendsList[i]) as Map<String, dynamic>;
+    Map<String, dynamic> decodedFriend = friendsList[i];
     String publicKey = getPublicKey(decodedFriend['privateKey']);
     List<dynamic> messagesHistory = [];
     String messagesHistoryString = prefs.getString('messagesHistory') ?? '{}';
@@ -302,15 +306,9 @@ Future<List<int>> checkForUnreadMessages(friendsList) async {
             (decodedFriend['latestSeenMessage'] ?? 0)) {
           decodedFriend['hasUnreadMessages'] = true;
           friendsWithUnreadMessages.add(i);
-        } else {
-          decodedFriend['hasUnreadMessages'] = false;
         }
       }
-      friendsList[i] = json.encode(decodedFriend);
       // Update SharedPreferences
-      await _lock.synchronized(() async {
-        prefs.setStringList('friends', friendsList);
-      });
     }
   }
   return friendsWithUnreadMessages;

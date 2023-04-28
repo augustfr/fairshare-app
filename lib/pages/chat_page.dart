@@ -235,7 +235,7 @@ class _ChatPageState extends State<ChatPage>
   }
 
   Future<void> _displayMessages() async {
-    chatProvider!.load();
+    chatProvider!.load(context);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,

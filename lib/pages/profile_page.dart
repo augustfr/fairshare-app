@@ -92,7 +92,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             TextButton(
               onPressed: () async {
-                removeAllFriends();
+                removeAllFriends(context);
                 Navigator.pop(context); // Close the dialog
                 Navigator.pushReplacement(
                   context,

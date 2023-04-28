@@ -13,7 +13,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synchronized/synchronized.dart';
 
 import './chat_page.dart';
-import './home_page.dart';
 import './profile_page.dart';
 import '../main.dart';
 import '../utils/friends.dart';
@@ -69,7 +68,7 @@ class _FriendsListPageState extends State<FriendsListPage>
   }
 
   Future<void> _removeFriend(int index) async {
-    await removeFriend(index);
+    await removeFriend(context, index);
     friendProvider?.load();
   }
 
@@ -246,13 +245,13 @@ class _FriendsListPageState extends State<FriendsListPage>
             Padding(
               padding: const EdgeInsets.only(top: 50),
               child: Consumer<FriendProvider>(
-                builder: (context, friend, child) {
-                  if (friend.isLoading) {
+                builder: (context, friendProvider, child) {
+                  if (friendProvider.isLoading) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  List<Map<String, dynamic>> friends = friend.friends;
+                  List<Map<String, dynamic>> friends = friendProvider.friends;
                   return RefreshIndicator(
-                      onRefresh: () => friend.load(),
+                      onRefresh: () => friendProvider.load(),
                       child: ListView.builder(
                         itemCount: friends.length,
                         itemBuilder: (BuildContext context, int index) {
@@ -261,8 +260,9 @@ class _FriendsListPageState extends State<FriendsListPage>
                                 child: Text('No friends found.'));
                           }
                           Map<String, dynamic> friend = friends[index];
-                          bool hasUnreadMessages =
-                              unreadMessageIndexes.contains(index);
+                          bool hasUnreadMessages = friendProvider
+                              .unreadMessageIndexes
+                              .contains(index);
                           return Dismissible(
                             key: Key(friend['name']),
                             direction: DismissDirection.endToStart,

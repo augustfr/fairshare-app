@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:fairshare/utils/friends.dart';
 import 'package:fairshare/utils/location.dart';
@@ -9,6 +11,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 class FriendProvider extends ChangeNotifier {
   bool isLoading = false;
   List<Map<String, dynamic>> friends = [];
+  Set<Marker> mapMarkers = {};
+  Set<int> unreadMessageIndexes = {};
 
   Future<void> load({bool showLoading = true}) async {
     if (showLoading) {
@@ -20,6 +24,10 @@ class FriendProvider extends ChangeNotifier {
 
     friends.clear();
     friends.addAll(friendsList);
+
+    await addFriendsToMap(friendsList);
+    unreadMessageIndexes = (await checkForUnreadMessages(friendsList)).toSet();
+
     if (showLoading) {
       isLoading = false;
     }
@@ -54,6 +62,53 @@ class FriendProvider extends ChangeNotifier {
     }).toList();
 
     return updatedFriendsFutures;
+  }
+
+  Future<void> addFriendsToMap(friendsList) async {
+    BitmapDescriptor customMarkerIcon =
+        await _createCircleMarkerIcon(Colors.red, 20);
+    Set<Marker> updatedMarkers = {};
+
+    for (var friendData in friendsList) {
+      String? friendName = friendData['name'];
+      final friendLocation = friendData['currentLocation'];
+
+      if (friendLocation != null) {
+        List<double> currentLocation =
+            parseLatLngFromString(friendData['currentLocation']);
+        double latitude = currentLocation[0];
+        double longitude = currentLocation[1];
+        updatedMarkers.add(
+          Marker(
+            markerId: MarkerId(friendName ?? 'Anonymous'),
+            position: LatLng(latitude, longitude),
+            infoWindow: InfoWindow(title: friendName ?? 'Anonymous'),
+            icon: customMarkerIcon,
+          ),
+        );
+      }
+    }
+
+    mapMarkers.clear();
+    mapMarkers.addAll(updatedMarkers);
+  }
+
+  Future<BitmapDescriptor> _createCircleMarkerIcon(
+      Color color, double circleRadius) async {
+    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(pictureRecorder);
+    final Paint paint = Paint()..color = color;
+    final double radius = circleRadius;
+
+    canvas.drawCircle(Offset(radius, radius), radius, paint);
+
+    final ui.Image image = await pictureRecorder
+        .endRecording()
+        .toImage((radius * 2).toInt(), (radius * 2).toInt());
+    final ByteData? byteData =
+        await image.toByteData(format: ui.ImageByteFormat.png);
+
+    return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
   }
 
   void clear() {

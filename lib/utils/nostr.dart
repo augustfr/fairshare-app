@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:encrypt/encrypt.dart' as encryptor;
 import 'package:fairshare/providers/chat.dart';
+import 'package:fairshare/providers/friend.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -19,7 +20,6 @@ import './location.dart';
 import './messages.dart';
 import '../main.dart';
 import '../pages/friends_list_page.dart';
-import '../pages/home_page.dart';
 import '../pages/qr_scanner.dart';
 import '../utils/debug_helper.dart';
 import '../utils/notification_helper.dart';
@@ -53,6 +53,7 @@ List<bool> isConnected = List<bool>.empty(growable: true);
 
 Future<void> connectWebSocket(BuildContext context) async {
   final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  final friendProvider = Provider.of<FriendProvider>(context, listen: false);
   await closeAllWebSockets();
   SharedPreferences prefs = SharedPreferencesHelper().prefs;
   List<String>? relays = prefs.getStringList('relays');
@@ -173,7 +174,6 @@ Future<void> connectWebSocket(BuildContext context) async {
                             await updateFriendsLocation(content, pubKey);
                             await setLatestLocationUpdate(timestamp, pubKey);
                           }
-                          needsUpdate = true;
                         } else if (content['type'] == 'message') {
                           final List<String> friendInfo =
                               await getFriendInfo(pubKey);
@@ -189,15 +189,16 @@ Future<void> connectWebSocket(BuildContext context) async {
                                 pubKey, content['globalKey'], text, timestamp);
                           }
 
-                          needsUpdate = true;
                           needsChatListUpdate = true;
                           if (friendIndex == chatProvider.friendIndex) {
-                            chatProvider.load();
+                            chatProvider.load(context);
                           } else {
                             displayNotification(
                                 friendName, 'Message', friendIndex);
                           }
                         }
+
+                        friendProvider.load(showLoading: false);
                         await setLatestReceivedEvent(timestamp, pubKey);
                         await setLatestReceivedEventSig(eventSig, pubKey);
                       }

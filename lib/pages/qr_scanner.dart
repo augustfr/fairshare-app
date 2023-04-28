@@ -174,7 +174,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
           "globalKey": globalKey
         };
         String jsonString = json.encode(jsonMap);
-        bool added = await addFriend(jsonString, photoPath);
+        bool added = await addFriend(context, jsonString, photoPath);
 
         if (added) {
           widget.onQRScanSuccess();

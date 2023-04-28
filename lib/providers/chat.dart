@@ -1,8 +1,10 @@
 import 'dart:convert';
 
 import 'package:fairshare/pages/chat_page.dart';
+import 'package:fairshare/providers/friend.dart';
 import 'package:fairshare/utils/nostr.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synchronized/synchronized.dart';
 
@@ -17,7 +19,7 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> load() async {
+  Future<void> load(BuildContext context) async {
     if (shareKey == null || friendIndex == null) return;
     List<Message> fetchedMessages = [];
     String publicKey = getPublicKey(shareKey);
@@ -90,8 +92,8 @@ class ChatProvider extends ChangeNotifier {
         friendData['latestSeenMessage'] = latestSeenMessageTimestamp;
         friendsList[friendIndex!] = json.encode(friendData);
         await prefs.setStringList('friends', friendsList);
-        // needsUpdate = true;
-        // needsChatListUpdate = true;
+        Provider.of<FriendProvider>(context, listen: false)
+            .load(showLoading: false);
       });
     }
 
@@ -102,6 +104,5 @@ class ChatProvider extends ChangeNotifier {
     shareKey = null;
     friendIndex = null;
     messages.clear();
-    notifyListeners();
   }
 }
