@@ -19,7 +19,7 @@ import '../utils/friends.dart';
 
 final _lock = Lock();
 
-bool needsChatListUpdate = false;
+bool isFriendListPage = false;
 
 class FriendsListPage extends StatefulWidget {
   const FriendsListPage({Key? key}) : super(key: key);
@@ -35,6 +35,7 @@ class _FriendsListPageState extends State<FriendsListPage>
   @override
   void initState() {
     super.initState();
+    isFriendListPage = true;
   }
 
   @override
@@ -45,6 +46,7 @@ class _FriendsListPageState extends State<FriendsListPage>
 
   @override
   void dispose() {
+    isFriendListPage = false;
     super.dispose();
   }
 

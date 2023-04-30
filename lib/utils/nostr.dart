@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:encrypt/encrypt.dart' as encryptor;
+import 'package:fairshare/pages/friends_list_page.dart';
 import 'package:fairshare/providers/chat.dart';
 import 'package:fairshare/providers/friend.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +20,6 @@ import './friends.dart';
 import './location.dart';
 import './messages.dart';
 import '../main.dart';
-import '../pages/friends_list_page.dart';
 import '../pages/qr_scanner.dart';
 import '../utils/debug_helper.dart';
 import '../utils/notification_helper.dart';
@@ -189,12 +189,13 @@ Future<void> connectWebSocket(BuildContext context) async {
                                 pubKey, content['globalKey'], text, timestamp);
                           }
 
-                          needsChatListUpdate = true;
                           if (friendIndex == chatProvider.friendIndex) {
                             chatProvider.load(context);
                           } else {
-                            displayNotification(
-                                friendName, 'Message', friendIndex);
+                            if (!isFriendListPage) {
+                              displayNotification(
+                                  friendName, 'Message', friendIndex);
+                            }
                           }
                         }
 
