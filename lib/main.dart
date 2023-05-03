@@ -3,6 +3,7 @@ import 'package:fairshare/providers/friend.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_config_plus/flutter_config_plus.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -35,6 +36,7 @@ void main() async {
   await FlutterConfigPlus.loadEnvVariables();
   sendApiKeyToNative();
   await SharedPreferencesHelper().init();
+  await Geolocator.checkPermission();
   runApp(const MyApp());
 }
 

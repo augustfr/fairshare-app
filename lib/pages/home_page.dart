@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:fairshare/providers/friend.dart';
 import 'package:fairshare/utils/extensions.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -86,6 +87,15 @@ class _HomePageState extends State<HomePage>
       oldLocation = LatLng(latitude, longitude);
     });
 
+    await GeolocatorPlatform.instance.isLocationServiceEnabled();
+
+    final myLocation = await Geolocator.getCurrentPosition();
+    setState(() {
+      myCurrentLocation = LatLng(myLocation.latitude, myLocation.longitude);
+      initialCameraPosition =
+          CameraPosition(target: myCurrentLocation, zoom: 14.4746);
+    });
+
     _locationSubscription =
         location.onLocationChanged.listen((LocationData currentLocation) async {
       // Update latitude and longitude in SharedPreferences
@@ -154,6 +164,7 @@ class _HomePageState extends State<HomePage>
     WidgetsBinding.instance.addObserver(this);
     _getCurrentLocation();
     _checkFirstTimeUser();
+    // _subscribeToLocationUpdates();
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _subscribeToLocationUpdates());
     _initializeAsyncDependencies();
