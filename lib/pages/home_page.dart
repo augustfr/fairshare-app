@@ -41,6 +41,8 @@ class _HomePageState extends State<HomePage>
   CameraPosition initialCameraPosition =
       CameraPosition(target: LatLng(0, 0), zoom: 14.4746);
 
+  late Future<CameraPosition> _initialCameraPosition;
+
   StreamSubscription<LocationData>? _locationSubscription;
 
   FriendProvider? friendProvider;
@@ -162,7 +164,8 @@ class _HomePageState extends State<HomePage>
     _loadSwitchValue();
     _initializeNotification();
     WidgetsBinding.instance.addObserver(this);
-    _getCurrentLocation();
+
+    _initialCameraPosition = _getCurrentLocation();
     _checkFirstTimeUser();
     // _subscribeToLocationUpdates();
     WidgetsBinding.instance
@@ -202,7 +205,7 @@ class _HomePageState extends State<HomePage>
   }
 
   // Method to get current location
-  Future<void> _getCurrentLocation() async {
+  Future<CameraPosition> _getCurrentLocation() async {
     final latLng = await getCurrentLocation();
 
     // Save current location in SharedPreferences
@@ -210,9 +213,8 @@ class _HomePageState extends State<HomePage>
 
     await prefs.setDouble('current_latitude', latLng.latitude);
     await prefs.setDouble('current_longitude', latLng.longitude);
-    setState(() {
-      initialCameraPosition = CameraPosition(target: latLng, zoom: 14.4746);
-    });
+
+    return CameraPosition(target: latLng, zoom: 14.4746);
   }
 
   Future<void> _checkFirstTimeUser() async {
@@ -223,7 +225,11 @@ class _HomePageState extends State<HomePage>
       await showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (BuildContext context) => const UserDetailsDialog(),
+        builder: (BuildContext context) => UserDetailsDialog(
+          onClose: () {
+            _initialCameraPosition = _getCurrentLocation();
+          },
+        ),
       );
       prefs.setBool('first_time', false);
     }
@@ -232,179 +238,192 @@ class _HomePageState extends State<HomePage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Consumer<FriendProvider>(
-            builder: (context, friend, child) {
-              if (friend.isLoading) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              return Stack(
-                children: [
-                  GoogleMap(
-                    initialCameraPosition: initialCameraPosition,
-                    myLocationEnabled: true,
-                    markers:
-                        friend.mapMarkers, // Add this line to include markers
-                    onMapCreated: (GoogleMapController controller) {
-                      _controller = controller;
-                      _controller!.setMapStyle(MapStyle().dark);
-                    },
-                  ),
-                  Positioned(
-                    top: 40,
-                    right: 10,
-                    child: RawMaterialButton(
-                      onPressed: () async {
-                        bool? friendsListUpdated = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const FriendsListPage(),
-                          ),
-                        );
-                        if (friendsListUpdated == true) {
-                          _fetchAndUpdateData();
-                        }
-                      },
-                      shape: const CircleBorder(),
-                      fillColor: Colors.white,
-                      padding: const EdgeInsets.all(0),
-                      constraints: const BoxConstraints.tightFor(
-                        width: 56,
-                        height: 56,
+      body: FutureBuilder<CameraPosition>(
+        future: _initialCameraPosition,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          return Stack(
+            children: [
+              Consumer<FriendProvider>(
+                builder: (context, friend, child) {
+                  if (friend.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  return Stack(
+                    children: [
+                      GoogleMap(
+                        initialCameraPosition: initialCameraPosition,
+                        myLocationEnabled: true,
+                        markers: friend
+                            .mapMarkers, // Add this line to include markers
+                        onMapCreated: (GoogleMapController controller) {
+                          _controller = controller;
+                          _controller!.setMapStyle(MapStyle().dark);
+                        },
                       ),
-                      child: Stack(
-                        children: [
-                          const Icon(Icons.menu, color: Colors.black),
-                          if (friend.unreadMessageIndexes.isNotEmpty)
-                            Positioned(
-                              top: 0,
-                              right: 0,
-                              child: Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  color: Colors.red,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
+                      Positioned(
+                        top: 40,
+                        right: 10,
+                        child: RawMaterialButton(
+                          onPressed: () async {
+                            bool? friendsListUpdated = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const FriendsListPage(),
                               ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 40,
-                    left: 10,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20.0),
-                      child: Container(
-                        color: Colors.white,
-                        padding: const EdgeInsets.all(2),
-                        child: Material(
-                          type: MaterialType.transparency,
-                          child: InkWell(
-                            onTap: () {
-                              setState(() {
-                                switchValue = !switchValue;
-                              });
-                              _showGhostModePopup(
-                                context,
-                                switchValue
-                                    ? 'Ghost mode disabled'
-                                    : 'Ghost mode enabled',
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              width: 90,
-                              height: 56,
-                              child: Center(
-                                child: Stack(
-                                  children: [
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: Icon(
-                                        MdiIcons.ghost,
-                                        color: switchValue
-                                            ? Colors.grey
-                                            : Colors.red,
-                                      ),
-                                    ),
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: Icon(
-                                        Icons.location_on,
-                                        color: switchValue
-                                            ? Colors.blue
-                                            : Colors.grey,
-                                      ),
-                                    ),
-                                    Align(
-                                      alignment: Alignment.center,
-                                      child: Switch(
-                                        value: switchValue,
-                                        onChanged: (bool value) {
-                                          setState(() {
-                                            switchValue = value;
-                                          });
-                                          _showGhostModePopup(
-                                            context,
-                                            switchValue
-                                                ? 'Ghost mode disabled'
-                                                : 'Ghost mode enabled',
-                                          );
-                                          _saveSwitchValue(value);
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          Positioned(
-            bottom: 20,
-            child: SizedBox(
-              width: MediaQuery.of(context).size.width,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  FloatingActionButton(
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => QRScannerPage(
-                            onQRScanSuccess: () {
+                            );
+                            if (friendsListUpdated == true) {
                               _fetchAndUpdateData();
-                            },
+                            }
+                          },
+                          shape: const CircleBorder(),
+                          fillColor: Colors.white,
+                          padding: const EdgeInsets.all(0),
+                          constraints: const BoxConstraints.tightFor(
+                            width: 56,
+                            height: 56,
+                          ),
+                          child: Stack(
+                            children: [
+                              const Icon(Icons.menu, color: Colors.black),
+                              if (friend.unreadMessageIndexes.isNotEmpty)
+                                Positioned(
+                                  top: 0,
+                                  right: 0,
+                                  child: Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                    child: const Icon(Icons.add),
-                  ),
-                ],
+                      ),
+                      Positioned(
+                        top: 40,
+                        left: 10,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20.0),
+                          child: Container(
+                            color: Colors.white,
+                            padding: const EdgeInsets.all(2),
+                            child: Material(
+                              type: MaterialType.transparency,
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    switchValue = !switchValue;
+                                  });
+                                  _showGhostModePopup(
+                                    context,
+                                    switchValue
+                                        ? 'Ghost mode disabled'
+                                        : 'Ghost mode enabled',
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  width: 90,
+                                  height: 56,
+                                  child: Center(
+                                    child: Stack(
+                                      children: [
+                                        Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Icon(
+                                            MdiIcons.ghost,
+                                            color: switchValue
+                                                ? Colors.grey
+                                                : Colors.red,
+                                          ),
+                                        ),
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: Icon(
+                                            Icons.location_on,
+                                            color: switchValue
+                                                ? Colors.blue
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                        Align(
+                                          alignment: Alignment.center,
+                                          child: Switch(
+                                            value: switchValue,
+                                            onChanged: (bool value) {
+                                              setState(() {
+                                                switchValue = value;
+                                              });
+                                              _showGhostModePopup(
+                                                context,
+                                                switchValue
+                                                    ? 'Ghost mode disabled'
+                                                    : 'Ghost mode enabled',
+                                              );
+                                              _saveSwitchValue(value);
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-            ),
-          ),
-        ],
+              Positioned(
+                bottom: 20,
+                child: SizedBox(
+                  width: MediaQuery.of(context).size.width,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      FloatingActionButton(
+                        onPressed: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => QRScannerPage(
+                                onQRScanSuccess: () {
+                                  _fetchAndUpdateData();
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Icon(Icons.add),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
 class UserDetailsDialog extends StatefulWidget {
-  const UserDetailsDialog({Key? key}) : super(key: key);
+  final Function onClose;
+  const UserDetailsDialog({
+    required this.onClose,
+    Key? key,
+  }) : super(key: key);
 
   @override
   _UserDetailsDialogState createState() => _UserDetailsDialogState();
@@ -420,6 +439,7 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
       SharedPreferences prefs = SharedPreferencesHelper().prefs;
       prefs.setString('user_name', _userName);
       prefs.setString('global_key', generateRandomPrivateKey());
+      widget.onClose();
       Navigator.of(context).pop();
     }
   }
