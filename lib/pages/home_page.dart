@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:permission_handler/permission_handler.dart' as Permissor;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synchronized/synchronized.dart';
@@ -46,6 +47,45 @@ class _HomePageState extends State<HomePage>
   StreamSubscription<LocationData>? _locationSubscription;
 
   FriendProvider? friendProvider;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSwitchValue();
+    _initializeNotification();
+    WidgetsBinding.instance.addObserver(this);
+
+    _initialCameraPosition = _getCurrentLocation();
+    _checkFirstTimeUser();
+    // _subscribeToLocationUpdates();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _subscribeToLocationUpdates());
+    _initializeAsyncDependencies();
+  }
+
+  @override
+  void afterFirstLayout(BuildContext context) {
+    friendProvider = Provider.of<FriendProvider>(context, listen: false);
+    friendProvider!.load();
+  }
+
+  Future<void> _initializeNotification() async {
+    await initializeNotifications(context);
+  }
+
+  Future<void> _initializeAsyncDependencies() async {
+    SharedPreferences prefs = SharedPreferencesHelper().prefs;
+    List<String> relays = prefs.getStringList('relays') ?? [];
+    if (relays.isEmpty) {
+      prefs.setStringList('relays', defaultRelays);
+    }
+    await connectWebSocket(context);
+    await cleanLocalStorage();
+    await _fetchAndUpdateData();
+    if (switchValue) {
+      await sendLocationUpdate();
+    }
+  }
 
   void _showGhostModePopup(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -159,45 +199,6 @@ class _HomePageState extends State<HomePage>
   }
 
   @override
-  void initState() {
-    super.initState();
-    _loadSwitchValue();
-    _initializeNotification();
-    WidgetsBinding.instance.addObserver(this);
-
-    _initialCameraPosition = _getCurrentLocation();
-    _checkFirstTimeUser();
-    // _subscribeToLocationUpdates();
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _subscribeToLocationUpdates());
-    _initializeAsyncDependencies();
-  }
-
-  @override
-  void afterFirstLayout(BuildContext context) {
-    friendProvider = Provider.of<FriendProvider>(context, listen: false);
-    friendProvider!.load();
-  }
-
-  Future<void> _initializeNotification() async {
-    await initializeNotifications(context);
-  }
-
-  Future<void> _initializeAsyncDependencies() async {
-    SharedPreferences prefs = SharedPreferencesHelper().prefs;
-    List<String> relays = prefs.getStringList('relays') ?? [];
-    if (relays.isEmpty) {
-      prefs.setStringList('relays', defaultRelays);
-    }
-    await connectWebSocket(context);
-    await cleanLocalStorage();
-    await _fetchAndUpdateData();
-    if (switchValue) {
-      await sendLocationUpdate();
-    }
-  }
-
-  @override
   void dispose() {
     _locationSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -206,15 +207,27 @@ class _HomePageState extends State<HomePage>
 
   // Method to get current location
   Future<CameraPosition> _getCurrentLocation() async {
-    final latLng = await getCurrentLocation();
+    Permissor.PermissionStatus status = Permissor.PermissionStatus.denied;
+    while (status.isGranted) {
+      await Permissor.Permission.location.request();
+      status = await Permissor.Permission.location.status;
+    }
+    Position position = await Geolocator.getCurrentPosition();
 
-    // Save current location in SharedPreferences
     SharedPreferences prefs = SharedPreferencesHelper().prefs;
 
-    await prefs.setDouble('current_latitude', latLng.latitude);
-    await prefs.setDouble('current_longitude', latLng.longitude);
+    await prefs.setDouble('current_latitude', position.latitude);
+    await prefs.setDouble('current_longitude', position.longitude);
 
-    return CameraPosition(target: latLng, zoom: 14.4746);
+    _controller!.animateCamera(
+      CameraUpdate.newLatLngZoom(
+        LatLng(position.latitude, position.longitude),
+        15.0,
+      ),
+    );
+
+    return CameraPosition(
+        target: LatLng(position.latitude, position.longitude), zoom: 14.4746);
   }
 
   Future<void> _checkFirstTimeUser() async {
@@ -252,6 +265,7 @@ class _HomePageState extends State<HomePage>
                   if (friend.isLoading) {
                     return const Center(child: CircularProgressIndicator());
                   }
+
                   return Stack(
                     children: [
                       GoogleMap(
